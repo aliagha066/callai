@@ -32,7 +32,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[rgb(var(--bg))] text-[rgb(var(--fg))]">
+      <body className="flex min-h-full flex-col overflow-x-clip bg-[rgb(var(--bg))] text-[rgb(var(--fg))]">
         <AuthUIProvider>{children}</AuthUIProvider>
       </body>
     </html>

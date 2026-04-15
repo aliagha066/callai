@@ -12,12 +12,12 @@ export function MessageBubble({ message }: Props) {
     <div
       className={[
         isUser ? "flex justify-end" : "flex justify-start",
-        "transition-all duration-200",
+        "min-w-0 transition-all duration-200",
       ].join(" ")}
     >
       <div
         className={[
-          "max-w-[92%] sm:max-w-[78%]",
+          "max-w-[92%] min-w-0 break-words sm:max-w-[78%]",
           "rounded-2xl px-4 py-3 text-sm leading-relaxed sm:px-[18px] sm:py-[14px] sm:text-[15px]",
           "shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]",
           isUser

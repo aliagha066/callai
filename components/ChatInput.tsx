@@ -29,9 +29,9 @@ export function ChatInput({
   }, [value]);
 
   return (
-    <div className="border-t border-white/5 bg-black/35 backdrop-blur-xl">
-      <div className="mx-auto max-w-4xl px-4 py-4">
-        <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
+    <div className="w-full min-w-0 border-t border-white/5 bg-black/35 backdrop-blur-xl">
+      <div className="mx-auto max-w-4xl px-3 py-4 sm:px-4">
+        <div className="flex min-w-0 w-full items-end gap-2 rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
           <textarea
             ref={textareaRef}
             value={value}
@@ -39,7 +39,7 @@ export function ChatInput({
             disabled={disabled}
             placeholder={placeholder}
             rows={1}
-            className="max-h-40 min-h-[44px] flex-1 resize-none rounded-xl bg-black/20 px-3 py-2 text-sm leading-relaxed text-white placeholder:text-white/35 ring-1 ring-white/10 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+            className="max-h-40 min-h-[44px] min-w-0 flex-1 resize-none rounded-xl bg-black/20 px-3 py-2 text-sm leading-relaxed text-white placeholder:text-white/35 ring-1 ring-white/10 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -60,8 +60,8 @@ export function ChatInput({
           </button>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-xs text-white/40">
+        <div className="mt-2 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <p className="min-w-0 text-xs text-white/40">
             UI-only prototype. Voice/video, accounts, and saved chats come later.
           </p>
           <p className="hidden text-xs text-white/35 sm:block">

@@ -745,13 +745,13 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
   }
 
   return (
-    <div className="flex min-h-[100svh] flex-col bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
+    <div className="flex min-h-[100svh] w-full min-w-0 max-w-[100vw] flex-col overflow-x-clip bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[radial-gradient(60rem_36rem_at_55%_-10%,rgba(var(--accent),0.18),transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(36rem_22rem_at_10%_110%,rgba(34,211,238,0.04),transparent_60%)]" />
       </div>
 
-      <div className="flex flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-x-clip">
         <aside className="hidden w-72 flex-col border-r border-white/5 bg-black/25 backdrop-blur-xl md:flex">
           <div className="p-4">
             <button
@@ -923,8 +923,8 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-40 border-b border-white/5 bg-black/35 backdrop-blur-xl">
-            <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4">
-              <div className="flex items-center gap-3">
+            <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 sm:h-16 sm:flex-nowrap sm:px-4">
+              <div className="flex min-w-0 max-w-full items-center gap-2 max-sm:basis-full sm:gap-3">
                 <Link
                   href="/"
                   className="inline-flex items-center gap-2 rounded-full px-2 py-1 text-sm font-semibold text-white/70 transition-all duration-200 hover:bg-white/5 hover:text-white/90 hover:brightness-110"
@@ -936,7 +936,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
 
                 <Link
                   href="/"
-                  className="group flex items-center gap-3 rounded-2xl px-2 py-1 transition-colors hover:bg-white/5"
+                  className="group flex min-w-0 max-w-full items-center gap-2 rounded-2xl px-2 py-1 transition-colors hover:bg-white/5 sm:gap-3"
                   aria-label={`${brandName} home`}
                 >
                   <div className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-b from-neutral-900/60 via-neutral-900/30 to-indigo-500/10 ring-1 ring-white/10 shadow-[inset_0_-10px_18px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.10),0_0_22px_rgba(99,102,241,0.16)] transition-all duration-200 group-hover:brightness-110 group-hover:shadow-[inset_0_-10px_18px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12),0_0_28px_rgba(99,102,241,0.20)]">
@@ -949,18 +949,18 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
                       <div className="mt-1 h-[6px] w-3 rounded-b-full border-b border-white/70 opacity-60" />
                     </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold tracking-tight text-white/90">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold tracking-tight text-white/90">
                       {brandName}
                     </p>
-                    <p className="text-xs text-white/45">
+                    <p className="hidden text-xs text-white/45 sm:block">
                       Companion chat · UI prototype
                     </p>
                   </div>
                 </Link>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center justify-end gap-x-1.5 gap-y-2 sm:gap-2 max-sm:w-full max-sm:justify-start">
                 {headerActions.map((a) => (
                   <button
                     key={a.label}
@@ -985,17 +985,18 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
                 <button
                   type="button"
                   onClick={clearChat}
-                  className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-white/70 transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
                   title="Clear current chat"
                   disabled={isLoading}
                 >
-                  Clear chat
+                  <span className="sm:hidden">Clear</span>
+                  <span className="hidden sm:inline">Clear chat</span>
                 </button>
               </div>
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-4xl flex-1 px-4">
+          <main className="mx-auto w-full min-w-0 max-w-4xl flex-1 overflow-x-clip px-3 sm:px-4">
             <div className="py-7 sm:py-8">
               <div className="space-y-4 sm:space-y-5">
                 {messages.map((m) => (
@@ -1037,7 +1038,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
             </div>
           </main>
 
-          <div className="sticky bottom-0">
+          <div className="sticky bottom-0 w-full min-w-0 overflow-x-clip">
             <ChatInput
               value={text}
               onChange={setText}

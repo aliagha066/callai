@@ -190,8 +190,9 @@ export function AuthControls({ compact }: Props) {
       {open ? (
         <div
           className={[
-            "absolute right-0 mt-2 w-[320px] overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_30px_rgba(0,0,0,0.55)]",
-            compact ? "w-[300px]" : "",
+            "absolute z-50 mt-2 w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_30px_rgba(0,0,0,0.55)]",
+            "left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 sm:max-w-none",
+            compact ? "sm:w-[300px]" : "sm:w-[320px]",
           ].join(" ")}
         >
           <div className="p-4">

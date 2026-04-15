@@ -4,10 +4,10 @@ import { AuthNavbarArea } from "@/components/AuthNavbarArea";
 export function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-[rgb(var(--bg))]/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 max-sm:h-auto max-sm:flex-wrap max-sm:py-2">
         <Link
           href="/"
-          className="group relative inline-flex items-center gap-2 rounded-full px-2 py-1 transition-colors hover:bg-white/5"
+          className="group relative inline-flex min-w-0 max-w-full items-center gap-2 rounded-full px-2 py-1 transition-colors hover:bg-white/5"
         >
           <span
             aria-hidden="true"
@@ -31,7 +31,7 @@ export function Navbar() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-2 max-sm:w-full max-sm:justify-start">
           <Link
             href="/chat"
             className="hidden rounded-full px-4 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white/90 sm:inline-flex"

@@ -18,7 +18,7 @@ export function AuthNavbarArea() {
           </span>
         ) : null}
       </div>
-      <div className="sm:hidden">
+      <div className="flex flex-wrap items-center gap-2 sm:hidden">
         <UserSettingsControls />
         <AuthControls />
       </div>
