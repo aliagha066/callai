@@ -1,26 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core palette (RGB for easy alpha usage) */
+  --bg: 6 7 10; /* near-black */
+  --fg: 237 239 245; /* soft white */
+  --muted: 163 168 178; /* muted text */
+  --panel: 16 18 24; /* elevated surfaces */
+  --panel-2: 20 22 29;
+  --border: 44 48 60;
+  --accent: 129 140 248; /* indigo-400-ish */
+  --accent-2: 99 102 241; /* indigo-500-ish */
+  --ring: 129 140 248;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: rgb(var(--bg));
+  --color-foreground: rgb(var(--fg));
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+::selection {
+  background: rgba(var(--accent), 0.22);
+}
+
+/* Subtle premium focus ring */
+:focus-visible {
+  outline: 2px solid rgba(var(--ring), 0.45);
+  outline-offset: 2px;
 }
