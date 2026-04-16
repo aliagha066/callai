@@ -162,7 +162,7 @@ export function UserSettingsControls() {
       </button>
 
       {open ? (
-        <div className="absolute left-1/2 z-50 mt-2 w-[calc(100vw-24px)] max-w-[360px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_30px_rgba(0,0,0,0.55)] sm:left-auto sm:right-0 sm:w-[360px] sm:max-w-none sm:translate-x-0">
+        <div className="fixed left-1/2 top-20 z-50 w-[calc(100vw-24px)] max-w-[360px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_30px_rgba(0,0,0,0.55)] sm:absolute sm:top-auto sm:mt-2 sm:left-auto sm:right-0 sm:w-[360px] sm:max-w-none sm:translate-x-0">
           <div className="p-4">
             <p className="text-sm font-semibold text-white/85">Settings</p>
             <p className="mt-1 text-xs leading-5 text-white/55">

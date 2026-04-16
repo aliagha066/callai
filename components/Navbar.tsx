@@ -31,17 +31,19 @@ export function Navbar() {
           </span>
         </Link>
 
-        <nav className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-2 max-sm:w-full max-sm:justify-start">
+        <nav className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch max-sm:justify-start">
           <Link
             href="/chat"
             className="hidden rounded-full px-4 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white/90 sm:inline-flex"
           >
             Chat
           </Link>
-          <AuthNavbarArea />
+          <div className="min-w-0 max-sm:w-full">
+            <AuthNavbarArea />
+          </div>
           <Link
             href="/chat"
-            className="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 ring-1 ring-white/10 transition-all hover:bg-white/14 hover:ring-white/20"
+            className="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 ring-1 ring-white/10 transition-all hover:bg-white/14 hover:ring-white/20 max-sm:w-full"
           >
             Start Chatting
           </Link>

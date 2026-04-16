@@ -190,8 +190,9 @@ export function AuthControls({ compact }: Props) {
       {open ? (
         <div
           className={[
-            "absolute z-50 mt-2 w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_30px_rgba(0,0,0,0.55)]",
-            "left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 sm:max-w-none",
+            // Mobile: position relative to viewport to avoid off-screen overflow.
+            // Desktop: keep dropdown behavior anchored to the button.
+            "fixed left-1/2 top-20 z-50 w-[calc(100vw-24px)] max-w-[320px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_30px_rgba(0,0,0,0.55)] sm:absolute sm:top-auto sm:mt-2 sm:left-auto sm:right-0 sm:translate-x-0 sm:max-w-none",
             compact ? "sm:w-[300px]" : "sm:w-[320px]",
           ].join(" ")}
         >
