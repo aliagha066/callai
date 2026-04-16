@@ -1,0 +1,285 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type Props = {
+  onClose: () => void;
+  onUseText: (text: string) => void;
+};
+
+/** Minimal typings — not all TS lib targets include Web Speech API. */
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((ev: SpeechRecognitionResultLike) => void) | null;
+  onerror: ((ev: SpeechRecognitionErrorLike) => void) | null;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+};
+
+type SpeechRecognitionResultLike = {
+  results: {
+    length: number;
+    [index: number]: { 0: { transcript: string }; isFinal?: boolean };
+  };
+};
+
+type SpeechRecognitionErrorLike = {
+  error: string;
+};
+
+function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as Window &
+    typeof globalThis & {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+export function VoiceInputPanel({ onClose, onUseText }: Props) {
+  const recRef = useRef<SpeechRecognitionLike | null>(null);
+  const [supported] = useState(() => !!getSpeechRecognitionCtor());
+  const [listening, setListening] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [preview, setPreview] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const stopRecognition = useCallback(() => {
+    const rec = recRef.current;
+    if (!rec) return;
+    try {
+      rec.stop();
+    } catch {
+      try {
+        rec.abort();
+      } catch {
+        // ignore
+      }
+    }
+    recRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopRecognition();
+    };
+  }, [stopRecognition]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  const statusText = (() => {
+    if (!supported) return "Speech recognition not supported";
+    if (errorMessage) return errorMessage;
+    if (listening) return "Listening...";
+    if (processing) return "Processing...";
+    return "Ready — tap the microphone to speak";
+  })();
+
+  function handleStart() {
+    setErrorMessage(null);
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) return;
+
+    stopRecognition();
+
+    let rec: SpeechRecognitionLike;
+    try {
+      rec = new Ctor();
+    } catch {
+      return;
+    }
+
+    rec.continuous = true;
+    rec.interimResults = true;
+    try {
+      rec.lang = navigator.language || "en-US";
+    } catch {
+      rec.lang = "en-US";
+    }
+
+    rec.onresult = (event: SpeechRecognitionResultLike) => {
+      let transcript = "";
+      const results = event.results;
+      for (let i = 0; i < results.length; i++) {
+        transcript += results[i]?.[0]?.transcript ?? "";
+      }
+      setPreview(transcript.trim());
+    };
+
+    rec.onerror = (event: SpeechRecognitionErrorLike) => {
+      if (event.error === "aborted") return;
+      if (event.error === "no-speech") return;
+
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed"
+      ) {
+        setErrorMessage("Microphone access denied");
+        setListening(false);
+        setProcessing(false);
+        recRef.current = null;
+        return;
+      }
+
+      if (event.error === "audio-capture") {
+        setErrorMessage("Microphone access denied");
+        setListening(false);
+        setProcessing(false);
+        recRef.current = null;
+        return;
+      }
+
+      setListening(false);
+      setProcessing(false);
+      recRef.current = null;
+    };
+
+    rec.onstart = () => {
+      setListening(true);
+      setProcessing(false);
+    };
+
+    rec.onend = () => {
+      setListening(false);
+      setProcessing(false);
+      recRef.current = null;
+    };
+
+    recRef.current = rec;
+    try {
+      rec.start();
+    } catch {
+      setErrorMessage("Could not start speech recognition.");
+      setListening(false);
+      setProcessing(false);
+      recRef.current = null;
+    }
+  }
+
+  function handleStop() {
+    if (!recRef.current) {
+      setListening(false);
+      return;
+    }
+    setProcessing(true);
+    try {
+      recRef.current.stop();
+    } catch {
+      setProcessing(false);
+      stopRecognition();
+    }
+  }
+
+  function handleUseText() {
+    const t = preview.trim();
+    if (!t) return;
+    onUseText(t);
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[61] flex items-end justify-center p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Voice input"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-[min(85vh,36rem)] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_40px_rgba(0,0,0,0.6)]">
+        <div className="shrink-0 border-b border-white/10 px-4 py-3">
+          <p className="text-sm font-semibold text-white/85">Voice input</p>
+          <p className="mt-1 text-xs leading-relaxed text-white/50">
+            {statusText}
+          </p>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
+          {!supported ? (
+            <p className="text-sm leading-6 text-white/60">
+              Voice input is not supported on this browser yet.
+            </p>
+          ) : (
+            <>
+              <label className="text-xs font-semibold text-white/55">
+                Preview
+              </label>
+              <div className="mt-1 min-h-[5rem] max-h-[min(28vh,12rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-black/20 p-3 text-sm leading-relaxed text-white/80 ring-1 ring-white/5">
+                {preview ? (
+                  <p className="whitespace-pre-wrap break-words">{preview}</p>
+                ) : (
+                  <p className="text-white/40">Spoken text will appear here.</p>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleStart}
+                  disabled={listening || !supported}
+                  className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white/85 ring-1 ring-white/10 transition-all duration-200 hover:bg-white/14 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 min-[360px]:flex-none"
+                  title="Start microphone"
+                >
+                  <span aria-hidden className="text-base leading-none">
+                    {"\u{1F3A4}"}
+                  </span>
+                  Start
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  disabled={!listening}
+                  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white/75 transition-all duration-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 min-[360px]:flex-none"
+                  title="Stop"
+                >
+                  Stop
+                </button>
+              </div>
+
+              <p className="mt-3 text-[11px] leading-relaxed text-white/40">
+                Text is not sent automatically — review it in the message box,
+                then send when you are ready.
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="shrink-0 space-y-2 border-t border-white/10 p-4">
+          {supported ? (
+            <button
+              type="button"
+              onClick={handleUseText}
+              disabled={!preview.trim()}
+              className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-white/10 px-4 text-sm font-semibold text-white/85 ring-1 ring-white/10 transition-all duration-200 hover:bg-white/14 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Use text in message
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white/70 transition-all duration-200 hover:bg-white/10"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

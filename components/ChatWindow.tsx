@@ -10,6 +10,7 @@ import { AuthControls } from "@/components/AuthControls";
 import { useAuthUI } from "@/components/AuthUIProvider";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { SettingsProvider, useSettings } from "@/components/SettingsProvider";
+import { VoiceInputPanel } from "@/components/VoiceInputPanel";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
@@ -187,9 +188,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   );
   const mobileChatRowMenuIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
-  const [comingSoonKind, setComingSoonKind] = useState<"voice" | "video" | null>(
-    null,
-  );
+  const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
+  const [voiceInputOpen, setVoiceInputOpen] = useState(false);
 
   useEffect(() => {
     mobileChatRowMenuIdRef.current = mobileChatRowMenuId;
@@ -198,7 +198,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const headerActions = useMemo(
     () =>
       [
-        { label: "Voice", hint: "Voice (preview)", action: "voice" as const },
+        { label: "Voice", hint: "Dictate into the message box", action: "voice" as const },
         { label: "Video", hint: "Video (preview)", action: "video" as const },
         {
           label: "Modes",
@@ -1356,7 +1356,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     type="button"
                     onClick={() => {
                       if (a.action === "modes") openSettingsPanel();
-                      if (a.action === "voice") setComingSoonKind("voice");
+                      if (a.action === "voice") setVoiceInputOpen(true);
                       if (a.action === "video") setComingSoonKind("video");
                     }}
                     className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-white/70 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 hover:scale-[1.02] sm:px-3"
@@ -1445,14 +1445,27 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         </div>
       </div>
 
-      {comingSoonKind ? (
+      {voiceInputOpen ? (
+        <VoiceInputPanel
+          onClose={() => setVoiceInputOpen(false)}
+          onUseText={(spoken) => {
+            const t = spoken.trim();
+            if (!t) return;
+            setText((prev) => {
+              const p = prev.trimEnd();
+              if (!p) return t;
+              return `${p} ${t}`;
+            });
+          }}
+        />
+      ) : null}
+
+      {comingSoonKind === "video" ? (
         <div
           className="fixed inset-0 z-[61] flex items-end justify-center p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
-          aria-label={
-            comingSoonKind === "voice" ? "Voice coming soon" : "Video coming soon"
-          }
+          aria-label="Video coming soon"
         >
           <button
             type="button"
@@ -1461,13 +1474,9 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             onClick={() => setComingSoonKind(null)}
           />
           <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-4 shadow-[0_0_40px_rgba(0,0,0,0.6)]">
-            <p className="text-sm font-semibold text-white/85">
-              {comingSoonKind === "voice" ? "Voice" : "Video"}
-            </p>
+            <p className="text-sm font-semibold text-white/85">Video</p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              {comingSoonKind === "voice"
-                ? "Voice is coming soon."
-                : "Video is coming soon."}
+              Video is coming soon.
             </p>
             <button
               type="button"
