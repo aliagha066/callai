@@ -190,6 +190,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
+  const [autoPlayVoice, setAutoPlayVoice] = useState(false);
 
   useEffect(() => {
     mobileChatRowMenuIdRef.current = mobileChatRowMenuId;
@@ -1368,6 +1369,16 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                 <div className="min-w-0 shrink">
                   <AuthControls compact />
                 </div>
+                <label className="flex min-w-0 items-center gap-1 text-[11px] text-white/45">
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3 rounded border border-white/30 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+                    checked={autoPlayVoice}
+                    onChange={(e) => setAutoPlayVoice(e.target.checked)}
+                  />
+                  <span className="hidden sm:inline">Auto-play AI voice</span>
+                  <span className="sm:hidden">Auto voice</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => createNewChat({ openMobileDrawer: true })}
@@ -1395,7 +1406,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             <div className="py-7 sm:py-8">
               <div className="space-y-4 sm:space-y-5">
                 {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} />
+                  <MessageBubble
+                    key={m.id}
+                    message={m}
+                    autoPlayVoice={autoPlayVoice}
+                  />
                 ))}
                 {showLoginBanner ? (
                   <div className="flex justify-center">
