@@ -745,13 +745,13 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
   }
 
   return (
-    <div className="flex min-h-[100svh] w-full min-w-0 max-w-[100vw] flex-col overflow-x-clip bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
+    <div className="flex min-h-[100dvh] w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[radial-gradient(60rem_36rem_at_55%_-10%,rgba(var(--accent),0.18),transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(36rem_22rem_at_10%_110%,rgba(34,211,238,0.04),transparent_60%)]" />
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-x-clip">
+      <div className="flex w-full max-w-full min-h-0 min-w-0 flex-1 overflow-x-hidden">
         <aside className="hidden w-72 flex-col border-r border-white/5 bg-black/25 backdrop-blur-xl md:flex">
           <div className="p-4">
             <button
@@ -921,7 +921,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex w-full max-w-full min-w-0 flex-1 flex-col overflow-x-hidden">
           <header className="sticky top-0 z-40 border-b border-white/5 bg-black/35 backdrop-blur-xl">
             <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-x-2 gap-y-2 px-3 sm:h-16 sm:flex-nowrap sm:px-4">
               <div className="flex min-w-0 max-w-full items-center gap-2 max-sm:basis-full sm:gap-3">
@@ -996,7 +996,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
             </div>
           </header>
 
-          <main className="mx-auto w-full min-w-0 max-w-4xl flex-1 overflow-x-clip px-3 sm:px-4">
+          <main className="mx-auto w-full min-w-0 max-w-full sm:max-w-4xl flex-1 overflow-x-hidden px-3 sm:px-4">
             <div className="py-7 sm:py-8">
               <div className="space-y-4 sm:space-y-5">
                 {messages.map((m) => (
