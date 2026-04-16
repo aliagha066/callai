@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ChatMessage } from "@/data/sampleMessages";
 import { sampleMessages } from "@/data/sampleMessages";
@@ -178,7 +178,16 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
   const [loginBannerVisibleByChat, setLoginBannerVisibleByChat] = useState<
     Record<string, 1>
   >({});
+  const [mobileChatDrawerOpen, setMobileChatDrawerOpen] = useState(false);
+  const [mobileChatRowMenuId, setMobileChatRowMenuId] = useState<string | null>(
+    null,
+  );
+  const mobileChatRowMenuIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    mobileChatRowMenuIdRef.current = mobileChatRowMenuId;
+  }, [mobileChatRowMenuId]);
 
   const headerActions = useMemo(
     () => [
@@ -209,6 +218,35 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!mobileChatDrawerOpen) {
+      setMobileChatRowMenuId(null);
+      return;
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (mobileChatRowMenuIdRef.current) {
+        setMobileChatRowMenuId(null);
+        return;
+      }
+      setMobileChatDrawerOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileChatDrawerOpen]);
+
+  useEffect(() => {
+    if (!mobileChatRowMenuId) return;
+    function onPointerDown(e: PointerEvent) {
+      const el = e.target;
+      if (!(el instanceof Element)) return;
+      if (el.closest("[data-mobile-chat-menu-root]")) return;
+      setMobileChatRowMenuId(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [mobileChatRowMenuId]);
 
   useEffect(() => {
     if (isAuthed) return;
@@ -602,11 +640,15 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
     });
   }
 
-  function createNewChat() {
+  function createNewChat(opts?: { openMobileDrawer?: boolean }) {
     const now = new Date().toISOString();
     setIsLoading(false);
     setError(null);
     setText("");
+    const openDrawer =
+      !!opts?.openMobileDrawer &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches;
 
     if (!isAuthed || !user) {
       const chat: ChatSession = {
@@ -619,6 +661,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
       };
       setChats((prev) => [chat, ...prev]);
       setActiveChatId(chat.id);
+      if (openDrawer) setMobileChatDrawerOpen(true);
       return;
     }
 
@@ -654,6 +697,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
 
         setChats((prev) => [chat, ...prev.filter((c) => c.id !== "ephemeral")]);
         setActiveChatId(chat.id);
+        if (openDrawer) setMobileChatDrawerOpen(true);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create chat";
         setError(msg);
@@ -890,6 +934,275 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
     }
   }
 
+  function renderSidebarChatRows(forMobile: boolean) {
+    return (
+      <Fragment>
+        {filteredChats.map((c) => {
+          const isActive = c.id === activeChatId;
+          const isEditing = c.id === editingChatId;
+          const title =
+            c.title?.trim() ||
+            c.messages.find((m) => m.role === "user")?.content?.slice(0, 32) ||
+            "New Chat";
+
+          if (forMobile) {
+            if (isEditing) {
+              return (
+                <div
+                  key={c.id}
+                  className="w-full min-w-0 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 ring-1 ring-white/10"
+                >
+                  <input
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        commitRename(c.id, editingTitle);
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setEditingChatId(null);
+                        setEditingTitle("");
+                      }
+                    }}
+                    onBlur={() => commitRename(c.id, editingTitle)}
+                    maxLength={40}
+                    autoFocus
+                    className="w-full rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm font-medium text-white/90 ring-1 ring-white/5 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                  />
+                  <div className="mt-0.5 truncate text-xs text-white/35">
+                    {formatYmd(c.updatedAt)}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={c.id}
+                className={[
+                  "flex min-w-0 max-w-full items-stretch gap-0.5 rounded-2xl text-sm transition-colors ring-1 ring-transparent",
+                  isActive
+                    ? "bg-white/8 text-white/90 ring-white/10"
+                    : "text-white/70",
+                  isLoading ? "opacity-60" : "",
+                ].join(" ")}
+              >
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => {
+                    if (isLoading) return;
+                    if (editingChatId) return;
+                    setError(null);
+                    setActiveChatId(c.id);
+                    setMobileChatDrawerOpen(false);
+                  }}
+                  className="min-w-0 flex-1 overflow-hidden px-3 py-2 text-left"
+                  title={title}
+                >
+                  <div className="min-w-0 font-medium">
+                    <div className="truncate">{title}</div>
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-white/35">
+                    {formatYmd(c.updatedAt)}
+                  </div>
+                </button>
+                <div
+                  className="relative flex shrink-0 flex-col items-end pr-1 pt-1"
+                  data-mobile-chat-menu-root
+                >
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={mobileChatRowMenuId === c.id}
+                    aria-label="Chat actions"
+                    disabled={isLoading}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setMobileChatRowMenuId((id) => (id === c.id ? null : c.id));
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white/80 disabled:opacity-50"
+                  >
+                    ⋮
+                  </button>
+                  {mobileChatRowMenuId === c.id ? (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-full z-[70] mt-1 w-36 overflow-hidden rounded-xl border border-white/10 bg-[rgb(var(--panel))] py-1 shadow-[0_8px_30px_rgba(0,0,0,0.55)]"
+                    >
+                      <button
+                        role="menuitem"
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-xs font-semibold text-white/75 transition-colors hover:bg-white/10"
+                        onClick={() => {
+                          beginRename(c);
+                          setMobileChatRowMenuId(null);
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        role="menuitem"
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-xs font-semibold text-rose-300/90 transition-colors hover:bg-white/10"
+                        onClick={() => {
+                          if (isLoading) return;
+                          deleteChat(c.id);
+                          setMobileChatRowMenuId(null);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                if (isLoading) return;
+                if (editingChatId) return;
+                setError(null);
+                setActiveChatId(c.id);
+              }}
+              disabled={isLoading}
+              className={[
+                "group w-full rounded-2xl px-3 py-2 text-left text-sm transition-colors",
+                "ring-1 ring-transparent",
+                isActive
+                  ? "bg-white/8 text-white/90 ring-white/10"
+                  : "text-white/70 hover:bg-white/5 hover:text-white/85",
+                isLoading ? "opacity-60" : "",
+              ].join(" ")}
+              title={title}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1 font-medium">
+                  {isEditing ? (
+                    <input
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          commitRename(c.id, editingTitle);
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEditingChatId(null);
+                          setEditingTitle("");
+                        }
+                      }}
+                      onBlur={() => commitRename(c.id, editingTitle)}
+                      maxLength={40}
+                      autoFocus
+                      className="w-full rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm font-medium text-white/90 ring-1 ring-white/5 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                    />
+                  ) : (
+                    <div className="truncate">{title}</div>
+                  )}
+                </div>
+                <span className="flex items-center gap-1">
+                  <span
+                    role="button"
+                    tabIndex={isLoading ? -1 : 0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isLoading) return;
+                      togglePin(c.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isLoading) return;
+                      togglePin(c.id);
+                    }}
+                    aria-label={c.pinned ? "Unpin chat" : "Pin chat"}
+                    title={c.pinned ? "Unpin" : "Pin"}
+                    className={[
+                      "inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full transition-all duration-200",
+                      c.pinned
+                        ? "text-white/75 opacity-100"
+                        : "text-white/35 opacity-0 hover:bg-white/5 hover:text-white/60 group-hover:opacity-100",
+                    ].join(" ")}
+                  >
+                    📌
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={isLoading ? -1 : 0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      beginRename(c);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      beginRename(c);
+                    }}
+                    aria-label="Rename chat"
+                    title="Rename"
+                    className="inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full text-white/40 opacity-0 transition-all duration-200 hover:bg-white/5 hover:text-white/65 group-hover:opacity-100"
+                  >
+                    ✎
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={isLoading ? -1 : 0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isLoading) return;
+                      deleteChat(c.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isLoading) return;
+                      deleteChat(c.id);
+                    }}
+                    aria-label="Delete chat"
+                    title="Delete"
+                    className="inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full text-white/45 opacity-0 transition-all duration-200 hover:bg-white/5 hover:text-white/70 group-hover:opacity-100"
+                  >
+                    ×
+                  </span>
+                </span>
+              </div>
+              <div className="mt-0.5 truncate text-xs text-white/35">
+                {formatYmd(c.updatedAt)}
+              </div>
+            </button>
+          );
+        })}
+        {filteredChats.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-white/40">No chats found</div>
+        ) : null}
+      </Fragment>
+    );
+  }
+
   return (
     <div className="flex min-h-[100dvh] w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
       <div className="pointer-events-none fixed inset-0 -z-10">
@@ -902,7 +1215,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
           <div className="p-4">
             <button
               type="button"
-              onClick={createNewChat}
+              onClick={() => createNewChat()}
               className="inline-flex h-10 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white/80 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/8 hover:text-white/90 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isLoading}
               title="Start a new chat"
@@ -919,153 +1232,61 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-2 pb-4">
-            <div className="space-y-1">
-              {filteredChats.map((c) => {
-                const isActive = c.id === activeChatId;
-                const isEditing = c.id === editingChatId;
-                const title =
-                  c.title?.trim() ||
-                  c.messages.find((m) => m.role === "user")?.content?.slice(0, 32) ||
-                  "New Chat";
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      if (isLoading) return;
-                      if (editingChatId) return;
-                      setError(null);
-                      setActiveChatId(c.id);
-                    }}
-                    disabled={isLoading}
-                    className={[
-                      "group w-full rounded-2xl px-3 py-2 text-left text-sm transition-colors",
-                      "ring-1 ring-transparent",
-                      isActive
-                        ? "bg-white/8 text-white/90 ring-white/10"
-                        : "text-white/70 hover:bg-white/5 hover:text-white/85",
-                      isLoading ? "opacity-60" : "",
-                    ].join(" ")}
-                    title={title}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1 font-medium">
-                        {isEditing ? (
-                          <input
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                commitRename(c.id, editingTitle);
-                              }
-                              if (e.key === "Escape") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setEditingChatId(null);
-                                setEditingTitle("");
-                              }
-                            }}
-                            onBlur={() => commitRename(c.id, editingTitle)}
-                            maxLength={40}
-                            autoFocus
-                            className="w-full rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm font-medium text-white/90 ring-1 ring-white/5 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
-                          />
-                        ) : (
-                          <div className="truncate">{title}</div>
-                        )}
-                      </div>
-                      <span className="flex items-center gap-1">
-                        <span
-                          role="button"
-                          tabIndex={isLoading ? -1 : 0}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (isLoading) return;
-                            togglePin(c.id);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (isLoading) return;
-                            togglePin(c.id);
-                          }}
-                          aria-label={c.pinned ? "Unpin chat" : "Pin chat"}
-                          title={c.pinned ? "Unpin" : "Pin"}
-                          className={[
-                            "inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full transition-all duration-200",
-                            c.pinned
-                              ? "text-white/75 opacity-100"
-                              : "text-white/35 opacity-0 hover:bg-white/5 hover:text-white/60 group-hover:opacity-100",
-                          ].join(" ")}
-                        >
-                          📌
-                        </span>
-                        <span
-                          role="button"
-                          tabIndex={isLoading ? -1 : 0}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            beginRename(c);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
-                            e.preventDefault();
-                            e.stopPropagation();
-                            beginRename(c);
-                          }}
-                          aria-label="Rename chat"
-                          title="Rename"
-                          className="inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full text-white/40 opacity-0 transition-all duration-200 hover:bg-white/5 hover:text-white/65 group-hover:opacity-100"
-                        >
-                          ✎
-                        </span>
-                        <span
-                          role="button"
-                          tabIndex={isLoading ? -1 : 0}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (isLoading) return;
-                            deleteChat(c.id);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (isLoading) return;
-                            deleteChat(c.id);
-                          }}
-                          aria-label="Delete chat"
-                          title="Delete"
-                          className="inline-flex h-6 w-6 cursor-pointer select-none items-center justify-center rounded-full text-white/45 opacity-0 transition-all duration-200 hover:bg-white/5 hover:text-white/70 group-hover:opacity-100"
-                        >
-                          ×
-                        </span>
-                      </span>
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-white/35">
-                      {formatYmd(c.updatedAt)}
-                    </div>
-                  </button>
-                );
-              })}
-              {filteredChats.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-white/40">
-                  No chats found
-                </div>
-              ) : null}
-            </div>
+            <div className="space-y-1">{renderSidebarChatRows(false)}</div>
           </div>
         </aside>
+
+        {mobileChatDrawerOpen ? (
+          <div
+            className="fixed inset-0 z-[52] flex md:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Your chats"
+          >
+            <button
+              type="button"
+              aria-label="Close chat list"
+              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+              onClick={() => setMobileChatDrawerOpen(false)}
+            />
+            <aside className="relative z-[53] flex h-full min-h-0 w-[min(18rem,calc(100vw-3rem))] min-w-0 flex-col border-r border-white/5 bg-black/85 backdrop-blur-xl shadow-[8px_0_40px_rgba(0,0,0,0.45)]">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-3 py-3">
+                <p className="text-sm font-semibold text-white/85">Chats</p>
+                <button
+                  type="button"
+                  onClick={() => setMobileChatDrawerOpen(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/55 transition-colors hover:bg-white/10 hover:text-white/80"
+                  aria-label="Close"
+                  title="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="shrink-0 p-4">
+                <button
+                  type="button"
+                  onClick={() => createNewChat({ openMobileDrawer: true })}
+                  className="inline-flex h-10 w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white/80 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/8 hover:text-white/90 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isLoading}
+                  title="Start a new chat"
+                >
+                  New Chat
+                </button>
+                <div className="mt-3">
+                  <input
+                    value={chatSearch}
+                    onChange={(e) => setChatSearch(e.target.value)}
+                    placeholder="Search chats..."
+                    className="h-10 w-full rounded-2xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 placeholder:text-white/35 ring-1 ring-white/5 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                  />
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4">
+                <div className="space-y-1">{renderSidebarChatRows(true)}</div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
 
         <div className="flex w-full max-w-full min-w-0 flex-1 flex-col overflow-x-hidden">
           <header className="sticky top-0 z-40 border-b border-white/5 bg-black/35 backdrop-blur-xl">
@@ -1079,6 +1300,15 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
                   <span className="text-base leading-none">←</span>
                   <span className="hidden sm:inline">Back</span>
                 </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setMobileChatDrawerOpen(true)}
+                  className="md:hidden inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110"
+                  title="Open chat list"
+                >
+                  Chats
+                </button>
 
                 <Link
                   href="/"
@@ -1121,7 +1351,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
                 <AuthControls compact />
                 <button
                   type="button"
-                  onClick={createNewChat}
+                  onClick={() => createNewChat({ openMobileDrawer: true })}
                   className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
                   title="Start a new chat"
                   disabled={isLoading}
