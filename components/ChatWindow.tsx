@@ -8,6 +8,8 @@ import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { AuthControls } from "@/components/AuthControls";
 import { useAuthUI } from "@/components/AuthUIProvider";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { SettingsProvider, useSettings } from "@/components/SettingsProvider";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
@@ -139,8 +141,9 @@ function saveStoredState(chats: ChatSession[], activeChatId: string) {
   }
 }
 
-export function ChatWindow({ brandName = "CallAI" }: Props) {
+function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const { user, openLogin } = useAuthUI();
+  const { open: openSettingsPanel } = useSettings();
   const isAuthed = !!user;
   const authedUserId = user?.id ?? null;
   const [aiName, setAiName] = useState<string>("Sofia");
@@ -184,17 +187,25 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
   );
   const mobileChatRowMenuIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const [comingSoonKind, setComingSoonKind] = useState<"voice" | "video" | null>(
+    null,
+  );
 
   useEffect(() => {
     mobileChatRowMenuIdRef.current = mobileChatRowMenuId;
   }, [mobileChatRowMenuId]);
 
   const headerActions = useMemo(
-    () => [
-      { label: "Voice", hint: "Coming soon", disabled: true },
-      { label: "Video", hint: "Coming soon", disabled: true },
-      { label: "Modes", hint: "Coming soon", disabled: true },
-    ],
+    () =>
+      [
+        { label: "Voice", hint: "Voice (preview)", action: "voice" as const },
+        { label: "Video", hint: "Video (preview)", action: "video" as const },
+        {
+          label: "Modes",
+          hint: "Open settings — companion mode & style",
+          action: "modes" as const,
+        },
+      ] as const,
     [],
   );
 
@@ -452,10 +463,12 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
 
     void load();
     window.addEventListener("storage", onLocalChange);
+    window.addEventListener("callai:settings-saved", onLocalChange);
     window.addEventListener("callai:ai-name-updated", onAiNameEvent as EventListener);
     return () => {
       cancelled = true;
       window.removeEventListener("storage", onLocalChange);
+      window.removeEventListener("callai:settings-saved", onLocalChange);
       window.removeEventListener(
         "callai:ai-name-updated",
         onAiNameEvent as EventListener,
@@ -1341,14 +1354,20 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
                   <button
                     key={a.label}
                     type="button"
-                    disabled={a.disabled}
-                    className="hidden h-9 items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
+                    onClick={() => {
+                      if (a.action === "modes") openSettingsPanel();
+                      if (a.action === "voice") setComingSoonKind("voice");
+                      if (a.action === "video") setComingSoonKind("video");
+                    }}
+                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-white/70 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 hover:scale-[1.02] sm:px-3"
                     title={a.hint}
                   >
                     {a.label}
                   </button>
                 ))}
-                <AuthControls compact />
+                <div className="min-w-0 shrink">
+                  <AuthControls compact />
+                </div>
                 <button
                   type="button"
                   onClick={() => createNewChat({ openMobileDrawer: true })}
@@ -1425,7 +1444,51 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
           </div>
         </div>
       </div>
+
+      {comingSoonKind ? (
+        <div
+          className="fixed inset-0 z-[61] flex items-end justify-center p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={
+            comingSoonKind === "voice" ? "Voice coming soon" : "Video coming soon"
+          }
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
+            onClick={() => setComingSoonKind(null)}
+          />
+          <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-4 shadow-[0_0_40px_rgba(0,0,0,0.6)]">
+            <p className="text-sm font-semibold text-white/85">
+              {comingSoonKind === "voice" ? "Voice" : "Video"}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-white/60">
+              {comingSoonKind === "voice"
+                ? "Voice is coming soon."
+                : "Video is coming soon."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setComingSoonKind(null)}
+              className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white/10 px-4 text-sm font-semibold text-white/85 ring-1 ring-white/10 transition-all duration-200 hover:bg-white/14 hover:brightness-110"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+export function ChatWindow(props: Props) {
+  return (
+    <SettingsProvider>
+      <ChatWindowInner {...props} />
+      <SettingsPanel />
+    </SettingsProvider>
   );
 }
 

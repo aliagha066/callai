@@ -155,8 +155,11 @@ export function AuthControls({ compact }: Props) {
 
   if (user) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="hidden max-w-[220px] truncate text-sm font-medium text-white/70 sm:inline">
+      <div className="flex min-w-0 max-w-full items-center gap-2">
+        <span
+          className="min-w-0 max-w-[min(42vw,10rem)] truncate text-sm font-medium text-white/70 sm:max-w-[220px]"
+          title={displayEmail}
+        >
           {displayEmail}
         </span>
         <button

@@ -172,6 +172,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         if (!authedUserId) {
           saveGuestSettings(safe);
+          try {
+            window.dispatchEvent(new CustomEvent("callai:settings-saved"));
+          } catch {
+            // ignore
+          }
           return;
         }
 
@@ -185,6 +190,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           response_style: safe.responseStyle,
           updated_at: new Date().toISOString(),
         });
+        try {
+          window.dispatchEvent(new CustomEvent("callai:settings-saved"));
+        } catch {
+          // ignore
+        }
       },
     }),
     [settings, isOpen, authedUserId],
