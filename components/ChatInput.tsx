@@ -28,10 +28,24 @@ export function ChatInput({
     )}px`;
   }, [value]);
 
+  function handleFocus() {
+    if (typeof window === "undefined") return;
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (!isMobile) return;
+
+    // Defer slightly so the virtual keyboard has time to animate.
+    window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+  }
+
   return (
     <div className="w-full min-w-0 border-t border-white/5 bg-black/35 backdrop-blur-xl">
       <div className="mx-auto max-w-4xl px-3 py-4 sm:px-4">
-        <div className="flex min-w-0 w-full items-end gap-2 rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
+        <div className="flex w-full min-w-0 max-w-full items-end gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
           <textarea
             ref={textareaRef}
             value={value}
@@ -40,6 +54,7 @@ export function ChatInput({
             placeholder={placeholder}
             rows={1}
             className="max-h-40 min-h-[44px] min-w-0 flex-1 resize-none rounded-xl bg-black/20 px-3 py-2 text-sm leading-relaxed text-white placeholder:text-white/35 ring-1 ring-white/10 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+            onFocus={handleFocus}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
