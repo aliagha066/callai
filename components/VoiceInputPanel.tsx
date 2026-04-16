@@ -53,6 +53,8 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   const [preview, setPreview] = useState("");
   const previewRef = useRef("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [stoppedHint, setStoppedHint] = useState(false);
+  const stoppedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopRecognition = useCallback(() => {
     const rec = recRef.current;
@@ -72,6 +74,10 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   useEffect(() => {
     return () => {
       stopRecognition();
+      if (stoppedTimerRef.current) {
+        clearTimeout(stoppedTimerRef.current);
+        stoppedTimerRef.current = null;
+      }
     };
   }, [stopRecognition]);
 
@@ -105,6 +111,7 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   const statusText = (() => {
     if (!supported) return "Speech recognition not supported";
     if (errorMessage) return errorMessage;
+    if (stoppedHint) return "Stopped";
     if (sending) return "Sending...";
     if (listening) return "Listening...";
     if (processing) return "Processing...";
@@ -112,6 +119,11 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   })();
 
   function handleStart() {
+    setStoppedHint(false);
+    if (stoppedTimerRef.current) {
+      clearTimeout(stoppedTimerRef.current);
+      stoppedTimerRef.current = null;
+    }
     setErrorMessage(null);
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
@@ -202,6 +214,16 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   }
 
   function handleStop() {
+    if (stoppedTimerRef.current) {
+      clearTimeout(stoppedTimerRef.current);
+      stoppedTimerRef.current = null;
+    }
+    setStoppedHint(true);
+    stoppedTimerRef.current = setTimeout(() => {
+      setStoppedHint(false);
+      stoppedTimerRef.current = null;
+    }, 1400);
+
     if (!recRef.current) {
       setListening(false);
       return;

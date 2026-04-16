@@ -6,11 +6,13 @@ import type { ChatMessage } from "@/data/sampleMessages";
 type Props = {
   message: ChatMessage;
   autoPlayVoice?: boolean;
+  speakingMessageId?: string | null;
+  onTtsStart?: (messageId: string) => void;
+  onTtsEnd?: (messageId: string) => void;
+  onVoiceOutputUserGesture?: () => void;
 };
 
 type TtsLocaleCategory = "en" | "tr" | "az";
-
-let currentlySpeakingId: string | null = null;
 
 function getSpeechSynthesis() {
   if (typeof window === "undefined") return null;
@@ -195,16 +197,25 @@ function selectVoiceAndLang(
   return { voice: null, utterLang: "en-US" };
 }
 
-export function MessageBubble({ message, autoPlayVoice }: Props) {
+export function MessageBubble({
+  message,
+  autoPlayVoice,
+  speakingMessageId = null,
+  onTtsStart,
+  onTtsEnd,
+  onVoiceOutputUserGesture,
+}: Props) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const isTyping = message.id === "typing";
-  const [playing, setPlaying] = useState(false);
   const [hasAutoPlayed, setHasAutoPlayed] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
   const ttsSupported = useMemo(() => !!getSpeechSynthesis(), []);
+  const isSpeaking = speakingMessageId === message.id;
+  const isSpeakingRef = useRef(isSpeaking);
+  isSpeakingRef.current = isSpeaking;
 
   useEffect(() => {
     voicesRef.current = voices;
@@ -234,9 +245,12 @@ export function MessageBubble({ message, autoPlayVoice }: Props) {
   function stop() {
     const api = getSpeechSynthesis();
     if (!api) return;
-    api.synth.cancel();
-    currentlySpeakingId = null;
-    setPlaying(false);
+    try {
+      api.synth.cancel();
+    } catch {
+      // ignore
+    }
+    onTtsEnd?.(message.id);
   }
 
   function play() {
@@ -246,7 +260,15 @@ export function MessageBubble({ message, autoPlayVoice }: Props) {
     const text = message.content?.trim();
     if (!text) return;
 
-    api.synth.cancel();
+    onVoiceOutputUserGesture?.();
+
+    try {
+      api.synth.cancel();
+    } catch {
+      // ignore
+    }
+
+    onTtsStart?.(message.id);
 
     let list = voicesRef.current;
     try {
@@ -263,34 +285,35 @@ export function MessageBubble({ message, autoPlayVoice }: Props) {
     utter.lang = utterLang;
     if (voice) utter.voice = voice;
 
-    utter.onstart = () => {
-      currentlySpeakingId = message.id;
-      setPlaying(true);
-    };
     utter.onend = () => {
-      if (currentlySpeakingId === message.id) {
-        currentlySpeakingId = null;
-      }
-      setPlaying(false);
+      onTtsEnd?.(message.id);
     };
     utter.onerror = () => {
-      if (currentlySpeakingId === message.id) {
-        currentlySpeakingId = null;
-      }
-      setPlaying(false);
+      onTtsEnd?.(message.id);
     };
 
-    api.synth.speak(utter);
+    try {
+      api.synth.speak(utter);
+    } catch {
+      onTtsEnd?.(message.id);
+    }
   }
 
   useEffect(() => {
+    if (!isAssistant || isTyping) return;
     return () => {
-      if (currentlySpeakingId === message.id) {
-        stop();
+      if (!isSpeakingRef.current) return;
+      const api = getSpeechSynthesis();
+      if (api) {
+        try {
+          api.synth.cancel();
+        } catch {
+          // ignore
+        }
       }
+      onTtsEnd?.(message.id);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAssistant, isTyping, message.id, onTtsEnd]);
 
   useEffect(() => {
     if (!isAssistant || isTyping) return;
@@ -337,16 +360,29 @@ export function MessageBubble({ message, autoPlayVoice }: Props) {
         ) : showPlay ? (
           <div className="flex flex-col gap-1.5">
             <div>{message.content}</div>
-            <div className="mt-0.5 flex justify-end">
+            <p
+              className={[
+                "min-h-[1.125rem] text-[11px] font-medium leading-tight tabular-nums",
+                isSpeaking
+                  ? "text-neutral-300/95"
+                  : "invisible",
+              ].join(" ")}
+              aria-live={isSpeaking ? "polite" : "off"}
+              aria-hidden={!isSpeaking}
+            >
+              Speaking...
+            </p>
+            <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => (playing ? stop() : play())}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/10 px-2.5 py-1 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                onClick={() => (isSpeaking ? stop() : play())}
+                className="inline-flex min-h-[2rem] min-w-[4.25rem] shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/15 bg-black/10 px-3 py-1.5 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0 sm:px-2.5 sm:py-1"
+                aria-label={isSpeaking ? "Stop speaking" : "Play message"}
               >
                 <span aria-hidden className="text-[13px] leading-none">
-                  {"\u{1F50A}"}
+                  {isSpeaking ? "\u{1F507}" : "\u{1F50A}"}
                 </span>
-                {playing ? "Stop" : "Play"}
+                {isSpeaking ? "Stop" : "Play"}
               </button>
             </div>
           </div>

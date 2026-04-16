@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import type { ChatMessage } from "@/data/sampleMessages";
 import { sampleMessages } from "@/data/sampleMessages";
@@ -189,8 +196,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const mobileChatRowMenuIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
-  const [voiceInputOpen, setVoiceInputOpen] = useState(false);
+   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
   const [autoPlayVoice, setAutoPlayVoice] = useState(false);
+  const [ttsSpeakingMessageId, setTtsSpeakingMessageId] = useState<string | null>(
+    null,
+  );
+  const [voiceOutputUserActivated, setVoiceOutputUserActivated] = useState(false);
 
   useEffect(() => {
     mobileChatRowMenuIdRef.current = mobileChatRowMenuId;
@@ -216,6 +227,34 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   );
 
   const messages = useMemo(() => activeChat?.messages ?? [], [activeChat]);
+
+  const lastAssistantMessageId = useMemo(() => {
+    let last: string | null = null;
+    for (const m of messages) {
+      if (m.role === "assistant" && m.id !== TYPING_ID) last = m.id;
+    }
+    return last;
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {
+      // ignore
+    }
+    setTtsSpeakingMessageId(null);
+  }, [activeChatId]);
+
+  const handleTtsStart = useCallback((id: string) => {
+    setTtsSpeakingMessageId(id);
+  }, []);
+
+  const handleTtsEnd = useCallback((id: string) => {
+    setTtsSpeakingMessageId((prev) => (prev === id ? null : prev));
+  }, []);
+
   const filteredChats = useMemo(() => {
     const q = chatSearch.trim().toLowerCase();
     const base = q
@@ -1357,7 +1396,10 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     type="button"
                     onClick={() => {
                       if (a.action === "modes") openSettingsPanel();
-                      if (a.action === "voice") setVoiceInputOpen(true);
+                      if (a.action === "voice") {
+                        setVoiceOutputUserActivated(true);
+                        setVoiceInputOpen(true);
+                      }
                       if (a.action === "video") setComingSoonKind("video");
                     }}
                     className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-white/70 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/8 hover:text-white/85 hover:brightness-110 hover:scale-[1.02] sm:px-3"
@@ -1374,7 +1416,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     type="checkbox"
                     className="h-3 w-3 rounded border border-white/30 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
                     checked={autoPlayVoice}
-                    onChange={(e) => setAutoPlayVoice(e.target.checked)}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setAutoPlayVoice(on);
+                      if (on) setVoiceOutputUserActivated(true);
+                    }}
                   />
                   <span className="hidden sm:inline">Auto-play AI voice</span>
                   <span className="sm:hidden">Auto voice</span>
@@ -1409,7 +1455,17 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                   <MessageBubble
                     key={m.id}
                     message={m}
-                    autoPlayVoice={autoPlayVoice}
+                    autoPlayVoice={
+                      autoPlayVoice &&
+                      voiceOutputUserActivated &&
+                      m.id === lastAssistantMessageId
+                    }
+                    speakingMessageId={ttsSpeakingMessageId}
+                    onTtsStart={handleTtsStart}
+                    onTtsEnd={handleTtsEnd}
+                    onVoiceOutputUserGesture={() =>
+                      setVoiceOutputUserActivated(true)
+                    }
                   />
                 ))}
                 {showLoginBanner ? (
