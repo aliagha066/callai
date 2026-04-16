@@ -1457,6 +1457,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               return `${p} ${t}`;
             });
           }}
+          onSend={send}
         />
       ) : null}
 

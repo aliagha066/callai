@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Props = {
   onClose: () => void;
   onUseText: (text: string) => void;
+  onSend?: () => void;
 };
 
 /** Minimal typings — not all TS lib targets include Web Speech API. */
@@ -42,12 +43,15 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-export function VoiceInputPanel({ onClose, onUseText }: Props) {
+export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const [supported] = useState(() => !!getSpeechRecognitionCtor());
   const [listening, setListening] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [autoSend, setAutoSend] = useState(false);
   const [preview, setPreview] = useState("");
+  const previewRef = useRef("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const stopRecognition = useCallback(() => {
@@ -79,9 +83,29 @@ export function VoiceInputPanel({ onClose, onUseText }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
+  const applyPreviewToComposer = useCallback(
+    (text: string, shouldSend: boolean) => {
+      const t = text.trim();
+      if (!t) return;
+      onUseText(t);
+      if (shouldSend && onSend) {
+        setSending(true);
+        // Fire send, then close the panel. Chat logic remains unchanged.
+        try {
+          onSend();
+        } finally {
+          setSending(false);
+          onClose();
+        }
+      }
+    },
+    [onClose, onSend, onUseText],
+  );
+
   const statusText = (() => {
     if (!supported) return "Speech recognition not supported";
     if (errorMessage) return errorMessage;
+    if (sending) return "Sending...";
     if (listening) return "Listening...";
     if (processing) return "Processing...";
     return "Ready — tap the microphone to speak";
@@ -115,7 +139,9 @@ export function VoiceInputPanel({ onClose, onUseText }: Props) {
       for (let i = 0; i < results.length; i++) {
         transcript += results[i]?.[0]?.transcript ?? "";
       }
-      setPreview(transcript.trim());
+      const trimmed = transcript.trim();
+      previewRef.current = trimmed;
+      setPreview(trimmed);
     };
 
     rec.onerror = (event: SpeechRecognitionErrorLike) => {
@@ -155,6 +181,13 @@ export function VoiceInputPanel({ onClose, onUseText }: Props) {
       setListening(false);
       setProcessing(false);
       recRef.current = null;
+
+      if (autoSend) {
+        const latest = previewRef.current.trim();
+        if (latest) {
+          applyPreviewToComposer(latest, true);
+        }
+      }
     };
 
     recRef.current = rec;
@@ -185,7 +218,7 @@ export function VoiceInputPanel({ onClose, onUseText }: Props) {
   function handleUseText() {
     const t = preview.trim();
     if (!t) return;
-    onUseText(t);
+    applyPreviewToComposer(t, false);
     onClose();
   }
 
@@ -252,9 +285,22 @@ export function VoiceInputPanel({ onClose, onUseText }: Props) {
                 </button>
               </div>
 
-              <p className="mt-3 text-[11px] leading-relaxed text-white/40">
-                Text is not sent automatically — review it in the message box,
-                then send when you are ready.
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <label className="flex cursor-pointer items-center gap-2 text-[11px] font-medium text-white/65">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border border-white/25 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+                    checked={autoSend}
+                    onChange={(e) => setAutoSend(e.target.checked)}
+                  />
+                  <span>Auto send voice messages</span>
+                </label>
+              </div>
+
+              <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+                {autoSend
+                  ? "We’ll send the recognized text automatically when you stop speaking."
+                  : "Text is not sent automatically — review it in the message box, then send when you are ready."}
               </p>
             </>
           )}
@@ -283,3 +329,4 @@ export function VoiceInputPanel({ onClose, onUseText }: Props) {
     </div>
   );
 }
+
