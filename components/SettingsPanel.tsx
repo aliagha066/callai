@@ -120,7 +120,7 @@ export function SettingsPanel() {
 
               <div>
                 <label className="text-xs font-semibold text-white/60">
-                  Companion mode
+                  Companion Mode
                 </label>
                 <select
                   value={draft.companionMode}

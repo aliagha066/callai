@@ -14,6 +14,10 @@ type Props = {
   brandName?: string;
 };
 
+type PreferredLanguage = "Auto" | "English" | "Azerbaijani" | "Turkish";
+type CompanionMode = "Friend" | "Coach" | "Calm listener";
+type ResponseStyle = "Short" | "Balanced" | "Deep";
+
 type ChatSession = {
   id: string;
   title: string;
@@ -140,6 +144,12 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
   const isAuthed = !!user;
   const authedUserId = user?.id ?? null;
   const [aiName, setAiName] = useState<string>("Sofia");
+  const [displayName, setDisplayName] = useState<string>("");
+  const [preferredLanguage, setPreferredLanguage] =
+    useState<PreferredLanguage>("Auto");
+  const [companionMode, setCompanionMode] = useState<CompanionMode>("Friend");
+  const [responseStyle, setResponseStyle] =
+    useState<ResponseStyle>("Balanced");
   const initialChat: ChatSession = useMemo(() => {
     const now = new Date().toISOString();
     return {
@@ -230,54 +240,164 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
     // Typing indicator name: guest from localStorage, authed from Supabase.
     let cancelled = false;
 
-    function readGuestAiName() {
+    function readGuestSettings() {
       try {
         const cached = window.localStorage.getItem(AI_NAME_CACHE_KEY);
-        if (cached && cached.trim()) return cached.trim().slice(0, 40);
+        const cachedAiName = cached && cached.trim() ? cached.trim().slice(0, 40) : null;
 
         const guestRaw = window.localStorage.getItem(GUEST_SETTINGS_KEY);
-        if (!guestRaw) return null;
-        const parsed = JSON.parse(guestRaw) as unknown;
-        if (!parsed || typeof parsed !== "object") return null;
-        const obj = parsed as Record<string, unknown>;
-        const maybe = obj.ai_name ?? obj.aiName;
-        if (typeof maybe === "string" && maybe.trim()) {
-          return maybe.trim().slice(0, 40);
+        if (!guestRaw) {
+          return {
+            aiName: cachedAiName,
+            displayName: null,
+            preferredLanguage: null,
+            companionMode: null,
+            responseStyle: null,
+          };
         }
+
+        const parsed = JSON.parse(guestRaw) as unknown;
+        if (!parsed || typeof parsed !== "object") {
+          return {
+            aiName: cachedAiName,
+            displayName: null,
+            preferredLanguage: null,
+            companionMode: null,
+            responseStyle: null,
+          };
+        }
+
+        const obj = parsed as Record<string, unknown>;
+
+        const aiRaw = obj.ai_name ?? obj.aiName;
+        const aiFromSettings =
+          typeof aiRaw === "string" && aiRaw.trim() ? aiRaw.trim().slice(0, 40) : null;
+
+        const dnRaw = obj.display_name ?? obj.displayName;
+        const displayName =
+          typeof dnRaw === "string" && dnRaw.trim() ? dnRaw.trim().slice(0, 40) : null;
+
+        const plRaw = obj.preferred_language ?? obj.preferredLanguage;
+        const preferredLanguage =
+          plRaw === "Auto" ||
+          plRaw === "English" ||
+          plRaw === "Azerbaijani" ||
+          plRaw === "Turkish"
+            ? (plRaw as PreferredLanguage)
+            : null;
+
+        const cmRaw = obj.companion_mode ?? obj.companionMode;
+        const companionMode =
+          cmRaw === "Friend" || cmRaw === "Coach" || cmRaw === "Calm listener"
+            ? (cmRaw as CompanionMode)
+            : null;
+
+        const rsRaw = obj.response_style ?? obj.responseStyle;
+        const responseStyle =
+          rsRaw === "Short" || rsRaw === "Balanced" || rsRaw === "Deep"
+            ? (rsRaw as ResponseStyle)
+            : null;
+
+        return {
+          aiName: aiFromSettings || cachedAiName,
+          displayName,
+          preferredLanguage,
+          companionMode,
+          responseStyle,
+        };
       } catch {
         // ignore
       }
-      return null;
+      return {
+        aiName: null,
+        displayName: null,
+        preferredLanguage: null,
+        companionMode: null,
+        responseStyle: null,
+      };
     }
 
-    async function readAuthedAiName(uid: string) {
+    async function readAuthedSettings(uid: string) {
       try {
         const { data, error } = await supabase
           .from("user_settings")
-          .select("ai_name")
+          .select(
+            "display_name,ai_name,preferred_language,companion_mode,response_style",
+          )
           .eq("user_id", uid)
           .maybeSingle();
         if (error) throw error;
-        const name =
+
+        const aiName =
           typeof data?.ai_name === "string" && data.ai_name.trim()
             ? data.ai_name.trim().slice(0, 40)
             : null;
-        return name;
+
+        const displayName =
+          typeof (data as { display_name?: unknown })?.display_name === "string" &&
+          (data as { display_name?: string }).display_name?.trim()
+            ? (data as { display_name: string }).display_name.trim().slice(0, 40)
+            : null;
+
+        const preferredLanguageRaw = (data as { preferred_language?: unknown })
+          ?.preferred_language;
+        const preferredLanguage =
+          preferredLanguageRaw === "Auto" ||
+          preferredLanguageRaw === "English" ||
+          preferredLanguageRaw === "Azerbaijani" ||
+          preferredLanguageRaw === "Turkish"
+            ? (preferredLanguageRaw as PreferredLanguage)
+            : null;
+
+        const companionModeRaw = (data as { companion_mode?: unknown })?.companion_mode;
+        const companionMode =
+          companionModeRaw === "Friend" ||
+          companionModeRaw === "Coach" ||
+          companionModeRaw === "Calm listener"
+            ? (companionModeRaw as CompanionMode)
+            : null;
+
+        const responseStyleRaw = (data as { response_style?: unknown })?.response_style;
+        const responseStyle =
+          responseStyleRaw === "Short" ||
+          responseStyleRaw === "Balanced" ||
+          responseStyleRaw === "Deep"
+            ? (responseStyleRaw as ResponseStyle)
+            : null;
+
+        return { aiName, displayName, preferredLanguage, companionMode, responseStyle };
       } catch {
-        return null;
+        return {
+          aiName: null,
+          displayName: null,
+          preferredLanguage: null,
+          companionMode: null,
+          responseStyle: null,
+        };
       }
     }
 
     async function load() {
-      const guestName = readGuestAiName();
+      const guest = readGuestSettings();
       if (!authedUserId) {
-        if (!cancelled) setAiName(guestName || "Sofia");
+        if (cancelled) return;
+        setAiName(guest.aiName || "Sofia");
+        setDisplayName(guest.displayName || "");
+        setPreferredLanguage(guest.preferredLanguage || "Auto");
+        setCompanionMode(guest.companionMode || "Friend");
+        setResponseStyle(guest.responseStyle || "Balanced");
         return;
       }
 
-      const authedName = await readAuthedAiName(authedUserId);
       if (cancelled) return;
-      setAiName(authedName || guestName || "Sofia");
+      const authed = await readAuthedSettings(authedUserId);
+      if (cancelled) return;
+
+      setAiName(authed.aiName || guest.aiName || "Sofia");
+      setDisplayName(authed.displayName || guest.displayName || "");
+      setPreferredLanguage(authed.preferredLanguage || guest.preferredLanguage || "Auto");
+      setCompanionMode(authed.companionMode || guest.companionMode || "Friend");
+      setResponseStyle(authed.responseStyle || guest.responseStyle || "Balanced");
     }
 
     function onLocalChange() {
@@ -648,6 +768,23 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
     const shouldAutoTitleThisChat =
       isAuthed && activeChatId !== "ephemeral" && currentChatTitle === "New Chat";
 
+    // Lightweight recent context for the assistant (no extra storage).
+    const recentMessages = messages
+      .filter((m) => m.id !== TYPING_ID)
+      .slice(-8)
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+    const authedMetaName =
+      (user as { user_metadata?: { full_name?: string; name?: string } } | null)
+        ?.user_metadata?.full_name ||
+      (user as { user_metadata?: { full_name?: string; name?: string } } | null)
+        ?.user_metadata?.name ||
+      null;
+    const userDisplayName = displayName?.trim() ? displayName.trim() : authedMetaName;
+
     const userMsg: ChatMessage = { id: createId(), role: "user", content };
     const typingMsg: ChatMessage = {
       id: TYPING_ID,
@@ -695,7 +832,16 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({
+          message: content,
+          aiName,
+          userDisplayName: userDisplayName ?? undefined,
+          chatTitle: currentChatTitle,
+          recentMessages,
+          companionMode,
+          responseStyle,
+          preferredLanguage,
+        }),
       });
 
       const data = (await res.json()) as { reply?: string; error?: string };
