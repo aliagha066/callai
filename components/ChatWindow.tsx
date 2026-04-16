@@ -996,7 +996,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
             </div>
           </header>
 
-          <main className="mx-auto w-full min-w-0 max-w-full sm:max-w-4xl flex-1 overflow-x-hidden px-3 sm:px-4">
+          <main className="mx-auto w-full min-w-0 max-w-full sm:max-w-4xl flex-1 overflow-x-hidden px-3 pb-28 sm:px-4 sm:pb-0">
             <div className="py-7 sm:py-8">
               <div className="space-y-4 sm:space-y-5">
                 {messages.map((m) => (
@@ -1038,7 +1038,7 @@ export function ChatWindow({ brandName = "CallAI" }: Props) {
             </div>
           </main>
 
-          <div className="sticky bottom-0 w-full min-w-0 overflow-x-clip">
+          <div className="fixed inset-x-0 bottom-0 z-50 w-full min-w-0 max-w-full overflow-x-hidden sm:sticky sm:inset-x-auto sm:z-auto">
             <ChatInput
               value={text}
               onChange={setText}

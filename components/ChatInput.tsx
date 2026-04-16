@@ -43,10 +43,10 @@ export function ChatInput({
   }
 
   return (
-    <div className="w-full min-w-0 border-t border-white/5 bg-black/35 backdrop-blur-xl">
+    <div className="w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/5 bg-black/35 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
       <div className="w-full max-w-full overflow-x-hidden px-3">
         <div className="mx-auto w-full max-w-4xl py-4 sm:px-1 sm:py-4">
-          <div className="flex w-full max-w-full min-w-0 items-end gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
+          <div className="flex w-full max-w-full min-w-0 items-center gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
             <textarea
               ref={textareaRef}
               value={value}
