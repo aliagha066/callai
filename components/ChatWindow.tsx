@@ -164,7 +164,7 @@ function saveStoredState(chats: ChatSession[], activeChatId: string) {
 
 function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const { user, openLogin } = useAuthUI();
-  const { open: openSettingsPanel } = useSettings();
+  const { open: openSettingsPanel, settings, save: saveSettings } = useSettings();
   const isAuthed = !!user;
   const authedUserId = user?.id ?? null;
   const [aiName, setAiName] = useState<string>("Sofia");
@@ -234,7 +234,6 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const sendRef = useRef<(overrideContent?: string) => void | Promise<void>>(
     () => {},
   );
-  const [autoPlayVoice, setAutoPlayVoice] = useState(false);
   const [ttsSpeakingMessageId, setTtsSpeakingMessageId] = useState<string | null>(
     null,
   );
@@ -455,6 +454,15 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         if (!finals) return;
       }
 
+      if (!settings.autoSendVoiceMessages) {
+        setText((prev) => {
+          const p = prev.trimEnd();
+          if (!p) return latest;
+          return `${p} ${latest}`;
+        });
+        return;
+      }
+
       setDirectVoiceSending(true);
       Promise.resolve(sendRef.current(latest)).finally(() => {
         setDirectVoiceSending(false);
@@ -468,7 +476,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       stopDirectVoice();
       setVoiceInputOpen(true);
     }
-  }, [stopDirectVoice]);
+  }, [stopDirectVoice, settings.autoSendVoiceMessages, setText]);
 
   const toggleDirectVoice = useCallback(() => {
     setVoiceOutputUserActivated(true);
@@ -1763,11 +1771,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                   <input
                     type="checkbox"
                     className="h-3 w-3 rounded border border-white/30 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
-                    checked={autoPlayVoice}
+                    checked={settings.autoPlayAiVoice}
                     onChange={(e) => {
                       const on = e.target.checked;
-                      setAutoPlayVoice(on);
                       if (on) setVoiceOutputUserActivated(true);
+                      void saveSettings({ ...settings, autoPlayAiVoice: on });
                     }}
                   />
                   <span className="hidden sm:inline">Auto-play AI voice</span>
@@ -1804,10 +1812,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     key={m.id}
                     message={m}
                     autoPlayVoice={
-                      autoPlayVoice &&
+                      settings.autoPlayAiVoice &&
                       voiceOutputUserActivated &&
                       m.id === lastAssistantMessageId
                     }
+                    preferredVoiceLanguage={settings.preferredVoiceLanguage}
+                    voiceSpeechRate={settings.voiceSpeechRate}
                     speakingMessageId={ttsSpeakingMessageId}
                     onTtsStart={handleTtsStart}
                     onTtsEnd={handleTtsEnd}

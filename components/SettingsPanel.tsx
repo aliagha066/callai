@@ -5,6 +5,8 @@ import {
   type CompanionMode,
   type PreferredLanguage,
   type ResponseStyle,
+  type VoiceOutputLanguagePreference,
+  type VoiceSpeechRate,
   useSettings,
 } from "@/components/SettingsProvider";
 
@@ -47,7 +49,7 @@ export function SettingsPanel() {
         aria-hidden="true"
       />
       <div className="absolute right-4 top-20 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-white/10 bg-[rgb(var(--panel))] shadow-[0_0_40px_rgba(0,0,0,0.6)]">
-        <div className="p-4">
+        <div className="max-h-[min(70vh,34rem)] overflow-y-auto overflow-x-hidden p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-white/90">Settings</p>
@@ -157,6 +159,87 @@ export function SettingsPanel() {
                 <option value="Balanced">Balanced</option>
                 <option value="Deep">Deep</option>
               </select>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 ring-1 ring-white/5">
+              <p className="text-xs font-semibold text-white/70">Voice Settings</p>
+
+              <div className="mt-3 space-y-2">
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-[11px] font-medium text-white/65">
+                  <span>Auto-play AI voice</span>
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border border-white/25 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+                    checked={draft.autoPlayAiVoice}
+                    onChange={(e) =>
+                      setDraft((p) => ({ ...p, autoPlayAiVoice: e.target.checked }))
+                    }
+                  />
+                </label>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-[11px] font-medium text-white/65">
+                  <span>Auto-send voice messages</span>
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border border-white/25 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+                    checked={draft.autoSendVoiceMessages}
+                    onChange={(e) =>
+                      setDraft((p) => ({
+                        ...p,
+                        autoSendVoiceMessages: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold text-white/60">
+                    Preferred voice language
+                  </label>
+                  <select
+                    value={draft.preferredVoiceLanguage}
+                    onChange={(e) =>
+                      setDraft((p) => ({
+                        ...p,
+                        preferredVoiceLanguage: e.target
+                          .value as VoiceOutputLanguagePreference,
+                      }))
+                    }
+                    className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 ring-1 ring-white/5 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                  >
+                    <option value="Auto">Auto</option>
+                    <option value="English">English</option>
+                    <option value="Azerbaijani">Azerbaijani</option>
+                    <option value="Turkish">Turkish</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-white/60">
+                    Voice speed
+                  </label>
+                  <select
+                    value={draft.voiceSpeechRate}
+                    onChange={(e) =>
+                      setDraft((p) => ({
+                        ...p,
+                        voiceSpeechRate: e.target.value as VoiceSpeechRate,
+                      }))
+                    }
+                    className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-white/85 ring-1 ring-white/5 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                  >
+                    <option value="Slow">Slow</option>
+                    <option value="Normal">Normal</option>
+                    <option value="Fast">Fast</option>
+                  </select>
+                </div>
+              </div>
+
+              <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+                Voice language uses your message language when set to Auto.
+              </p>
             </div>
           </div>
 

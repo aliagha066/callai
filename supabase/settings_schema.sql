@@ -8,6 +8,10 @@ create table if not exists public.user_settings (
   preferred_language text not null default 'Auto',
   companion_mode text not null default 'Friend',
   response_style text not null default 'Balanced',
+  auto_play_ai_voice boolean not null default false,
+  auto_send_voice_messages boolean not null default false,
+  preferred_voice_language text not null default 'Auto',
+  voice_speech_rate text not null default 'Normal',
   updated_at timestamptz not null default now()
 );
 

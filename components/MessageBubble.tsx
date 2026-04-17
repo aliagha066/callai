@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@/data/sampleMessages";
+import type {
+  VoiceOutputLanguagePreference,
+  VoiceSpeechRate,
+} from "@/components/SettingsProvider";
 
 type Props = {
   message: ChatMessage;
   autoPlayVoice?: boolean;
+  preferredVoiceLanguage?: VoiceOutputLanguagePreference;
+  voiceSpeechRate?: VoiceSpeechRate;
   speakingMessageId?: string | null;
   onTtsStart?: (messageId: string) => void;
   onTtsEnd?: (messageId: string) => void;
@@ -197,9 +203,26 @@ function selectVoiceAndLang(
   return { voice: null, utterLang: "en-US" };
 }
 
+function preferenceToCategory(
+  pref: VoiceOutputLanguagePreference,
+): TtsLocaleCategory | null {
+  if (pref === "Auto") return null;
+  if (pref === "English") return "en";
+  if (pref === "Turkish") return "tr";
+  return "az";
+}
+
+function utteranceRateFromSetting(rate: VoiceSpeechRate): number {
+  const mapped =
+    rate === "Slow" ? 0.88 : rate === "Fast" ? 1.18 : 1;
+  return Math.min(1.35, Math.max(0.72, mapped));
+}
+
 export function MessageBubble({
   message,
   autoPlayVoice,
+  preferredVoiceLanguage = "Auto",
+  voiceSpeechRate = "Normal",
   speakingMessageId = null,
   onTtsStart,
   onTtsEnd,
@@ -220,6 +243,10 @@ export function MessageBubble({
   useEffect(() => {
     voicesRef.current = voices;
   }, [voices]);
+
+  useEffect(() => {
+    setHasAutoPlayed(false);
+  }, [message.id, autoPlayVoice, preferredVoiceLanguage, voiceSpeechRate]);
 
   useEffect(() => {
     const api = getSpeechSynthesis();
@@ -278,11 +305,13 @@ export function MessageBubble({
       // ignore
     }
 
-    const category = detectLocaleCategory(text);
+    const preferredCategory = preferenceToCategory(preferredVoiceLanguage);
+    const category = preferredCategory ?? detectLocaleCategory(text);
     const { voice, utterLang } = selectVoiceAndLang(list, category);
 
     const utter = new api.Utterance(text);
     utter.lang = utterLang;
+    utter.rate = utteranceRateFromSetting(voiceSpeechRate);
     if (voice) utter.voice = voice;
 
     utter.onend = () => {
@@ -328,7 +357,15 @@ export function MessageBubble({
     }, 140);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlayVoice, hasAutoPlayed, isAssistant, isTyping, ttsSupported]);
+  }, [
+    autoPlayVoice,
+    hasAutoPlayed,
+    isAssistant,
+    isTyping,
+    ttsSupported,
+    preferredVoiceLanguage,
+    voiceSpeechRate,
+  ]);
 
   const showPlay =
     isAssistant && !isTyping && ttsSupported && message.content.trim().length > 0;

@@ -8,6 +8,7 @@ import {
   type SpeechRecognitionLike,
   type SpeechRecognitionResultLike,
 } from "./speechRecognition";
+import { useSettings } from "@/components/SettingsProvider";
 
 type Props = {
   onClose: () => void;
@@ -16,12 +17,13 @@ type Props = {
 };
 
 export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
+  const { settings } = useSettings();
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const [supported] = useState(() => !!getSpeechRecognitionCtor());
   const [listening, setListening] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [sending, setSending] = useState(false);
-  const [autoSend, setAutoSend] = useState(false);
+  const [autoSend, setAutoSend] = useState(settings.autoSendVoiceMessages);
   const [preview, setPreview] = useState("");
   const previewRef = useRef("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -52,6 +54,10 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
       }
     };
   }, [stopRecognition]);
+
+  useEffect(() => {
+    setAutoSend(settings.autoSendVoiceMessages);
+  }, [settings.autoSendVoiceMessages]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
