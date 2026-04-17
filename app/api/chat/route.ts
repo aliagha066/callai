@@ -15,6 +15,12 @@ type ChatRequestBody = {
     role: "user" | "assistant";
     content: string;
   }[];
+  longTermMemory?: {
+    key: string;
+    value: string;
+    updatedAt: string;
+    source?: string;
+  }[];
 };
 
 export async function POST(req: Request) {
@@ -95,6 +101,27 @@ export async function POST(req: Request) {
         "Recent conversation context (oldest to newest, do not repeat this text back verbatim):\n" +
           formatted.join("\n"),
       );
+    }
+
+    if (Array.isArray(body.longTermMemory) && body.longTermMemory.length > 0) {
+      const safe = body.longTermMemory
+        .slice(0, 20)
+        .map((f) => {
+          const key = String(f?.key ?? "").trim();
+          const value = String(f?.value ?? "").trim();
+          if (!key || !value) return null;
+          const cleanValue = value.replace(/\s+/g, " ").slice(0, 140);
+          return `- ${key}: ${cleanValue}`;
+        })
+        .filter(Boolean) as string[];
+
+      if (safe.length) {
+        memoryPieces.push(
+          "Long-term user facts (ONLY from the user’s past messages; do not invent; do not mention you are storing this):\n" +
+            safe.join("\n") +
+            "\n\nUse these facts subtly to avoid re-asking obvious questions. If the user contradicts a fact, prefer the newest message.",
+        );
+      }
     }
 
     const memoryContext =

@@ -24,6 +24,13 @@ import {
   type SpeechRecognitionLike,
   type SpeechRecognitionResultLike,
 } from "@/components/speechRecognition";
+import {
+  extractMemoryFactsFromUserText,
+  loadMemoryFacts,
+  mergeMemoryFacts,
+  saveMemoryFacts,
+  type MemoryFact,
+} from "@/components/conversationMemory";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
@@ -214,6 +221,15 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     null,
   );
   const [voiceOutputUserActivated, setVoiceOutputUserActivated] = useState(false);
+  const [memoryFacts, setMemoryFacts] = useState<MemoryFact[]>([]);
+
+  useEffect(() => {
+    setMemoryFacts(loadMemoryFacts(authedUserId));
+  }, [authedUserId]);
+
+  useEffect(() => {
+    saveMemoryFacts(authedUserId, memoryFacts);
+  }, [authedUserId, memoryFacts]);
 
   useEffect(() => {
     mobileChatRowMenuIdRef.current = mobileChatRowMenuId;
@@ -948,6 +964,17 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     const content = (overrideContent ?? text).trim();
     if (!content || isLoading) return;
 
+    // Lightweight long-term memory: extract a few safe facts from REAL user text.
+    // Stored locally per-user (or guest) and optionally sent as extra context.
+    try {
+      const extracted = extractMemoryFactsFromUserText(content);
+      if (extracted.length) {
+        setMemoryFacts((prev) => mergeMemoryFacts(prev, extracted));
+      }
+    } catch {
+      // ignore memory failures
+    }
+
     setInteractedByChat((prev) => ({ ...prev, [activeChatId]: 1 }));
 
     const currentChatTitle =
@@ -1026,6 +1053,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
           userDisplayName: userDisplayName ?? undefined,
           chatTitle: currentChatTitle,
           recentMessages,
+          longTermMemory: memoryFacts,
           companionMode,
           responseStyle,
           preferredLanguage,
@@ -1087,6 +1115,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     messages,
     preferredLanguage,
     responseStyle,
+    memoryFacts,
     text,
     updateActiveChat,
     user,
