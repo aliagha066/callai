@@ -1729,8 +1729,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                 }, 1200);
                 stopDirectVoice();
               }}
-              onVoiceTapFallback={() => {
-                // Safe fallback: open the existing voice panel.
+              onVoiceOpenPanelFallback={() => {
+                // Secondary path only (right click / long-press context menu).
                 setVoiceOutputUserActivated(true);
                 setVoiceInputOpen(true);
               }}

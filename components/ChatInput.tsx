@@ -8,7 +8,7 @@ type Props = {
   onSend: () => void;
   onVoicePressStart?: () => void;
   onVoicePressEnd?: () => void;
-  onVoiceTapFallback?: () => void;
+  onVoiceOpenPanelFallback?: () => void;
   voiceListening?: boolean;
   voiceStatusText?: string | null;
   voiceStatusKind?: "idle" | "listening" | "working" | "speaking";
@@ -22,7 +22,7 @@ export function ChatInput({
   onSend,
   onVoicePressStart,
   onVoicePressEnd,
-  onVoiceTapFallback,
+  onVoiceOpenPanelFallback,
   voiceListening,
   voiceStatusText,
   voiceStatusKind = "idle",
@@ -31,6 +31,7 @@ export function ChatInput({
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pttActiveRef = useRef(false);
+  const pressStartedAtRef = useRef<number | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,7 +89,7 @@ export function ChatInput({
                 }}
               />
 
-              {onVoicePressStart || onVoiceTapFallback ? (
+              {onVoicePressStart || onVoiceOpenPanelFallback ? (
                 <div className="relative shrink-0">
                   <button
                     type="button"
@@ -97,6 +98,7 @@ export function ChatInput({
                       if (disabled) return;
                       // Push-to-talk: press = start listening.
                       pttActiveRef.current = true;
+                      pressStartedAtRef.current = Date.now();
                       try {
                         (e.currentTarget as HTMLButtonElement).setPointerCapture(
                           e.pointerId,
@@ -110,6 +112,8 @@ export function ChatInput({
                     onPointerUp={(e) => {
                       if (!onVoicePressEnd) return;
                       if (!pttActiveRef.current) return;
+                      const startedAt = pressStartedAtRef.current;
+                      pressStartedAtRef.current = null;
                       pttActiveRef.current = false;
                       try {
                         (e.currentTarget as HTMLButtonElement).releasePointerCapture(
@@ -119,21 +123,35 @@ export function ChatInput({
                         // ignore
                       }
                       e.preventDefault();
-                      // Release = stop listening (existing flow continues: processing/sending).
-                      onVoicePressEnd();
+                      // If it was a quick tap, keep listening and let recognition end naturally.
+                      const heldForMs = startedAt ? Date.now() - startedAt : 9999;
+                      if (heldForMs >= 260) {
+                        // Release after hold = stop listening (existing flow continues: processing/sending).
+                        onVoicePressEnd();
+                      }
                     }}
                     onPointerCancel={() => {
                       if (!onVoicePressEnd) return;
                       if (!pttActiveRef.current) return;
                       pttActiveRef.current = false;
+                      pressStartedAtRef.current = null;
                       onVoicePressEnd();
                     }}
                     onClick={() => {
                       // Pointer up triggers click; ignore those.
                       if (pttActiveRef.current) return;
-                      if (!onVoiceTapFallback) return;
+                      // Tap behavior: start listening (primary flow).
+                      if (onVoicePressStart) {
+                        onVoicePressStart();
+                        return;
+                      }
                       if (disabled) return;
-                      onVoiceTapFallback();
+                    }}
+                    onContextMenu={(e) => {
+                      if (!onVoiceOpenPanelFallback) return;
+                      e.preventDefault();
+                      if (disabled) return;
+                      onVoiceOpenPanelFallback();
                     }}
                     disabled={disabled}
                     className={[
