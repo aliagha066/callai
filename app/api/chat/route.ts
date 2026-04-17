@@ -29,24 +29,67 @@ type ForcedLanguage = "en" | "tr" | "az" | "ru";
 
 function detectForcedLanguageFromLatestMessage(message: string): ForcedLanguage {
   const t = message.trim();
+  const lower = t.toLowerCase();
+
+  function scoreByPatterns(patterns: RegExp[]): number {
+    let score = 0;
+    for (const re of patterns) {
+      if (re.test(lower)) score += 1;
+    }
+    return score;
+  }
+
   // 1) Cyrillic -> Russian
   if (/[\u0400-\u04FF]/.test(t)) return "ru";
 
-  // 2) Azerbaijani strong signals: ə/Ə always wins; plus common AZ words.
+  // 2) Azerbaijani strong signals: ə/Ə always wins.
   if (/[\u0259\u018F]/.test(t)) return "az";
-  if (/\b(nec\u0259|nec\u0259s\u0259n|salam|azerbaycan|az\u0259rbaycan|sa\u011Fol|sagol)\b/i.test(t)) {
-    return "az";
-  }
 
-  // 3) Turkish signals: dotted/dotless i and Turkish-specific letters; plus common words.
+  // 3) Turkish strong signals: Turkish-specific letters (ı, ş, ç, ö, ü, ğ, İ).
   if (
     /[\u0131\u0130\u011F\u011E\u00FC\u00DC\u00F6\u00D6\u015F\u015E\u00E7\u00C7]/.test(t)
   ) {
     return "tr";
   }
-  if (/\b(nas\u0131l|nas\u0131ls\u0131n|merhaba)\b/i.test(t)) return "tr";
 
-  // 4) Default -> English
+  // 4) No diacritics: score common transliterations / phrases.
+  // Keep patterns high-signal to avoid misclassifying English.
+  const trPatterns: RegExp[] = [
+    /\b(nasilsin|nasilsiniz|nasil|merhaba|selam)\b/,
+    /\b(iyiyim|iyidir|iyiydi|iyiyiz)\b/,
+    /\b(ne yapiyorsun|ne yapiyosun|ne yapiyon)\b/,
+    /\b(gorusuruz|gorusmek uzere|goruşuruz|gorusur)\b/,
+    /\b(tamam|evet|hayir)\b/,
+    /\b(bir sey|birsey)\b/,
+    /\b(bugun|bu gun)\b/,
+  ];
+
+  const azPatterns: RegExp[] = [
+    /\b(necesen|necesiz|nece sen|nece\s*sen)\b/,
+    /\b(salam)\b/,
+    /\b(yaxsiyam|yaxshiyam|yaxsi|yaxshi)\b/,
+    /\b(ne var ne yox|ne var neyox|ne var)\b/,
+    /\b(indi)\b/,
+    /\b(men)\b/,
+    /\b(neynirsen|neynersen|ne edirsen|ne edirsən)\b/,
+    /\b(basa dusdum|basa dusmedim|basa dusmuram)\b/,
+    /\b(xeyr|beli)\b/,
+    /\b(azerbaycan|azerbaijan)\b/,
+    /\b(sag ol|sagol)\b/,
+  ];
+
+  const trScore = scoreByPatterns(trPatterns);
+  const azScore = scoreByPatterns(azPatterns);
+
+  // If we have a strong match, prefer TR/AZ over English.
+  if (trScore >= 2 && trScore > azScore) return "tr";
+  if (azScore >= 2 && azScore > trScore) return "az";
+
+  // Single strong keyword fallback (e.g. "nasilsin", "necesen").
+  if (trScore === 1 && azScore === 0) return "tr";
+  if (azScore === 1 && trScore === 0) return "az";
+
+  // 5) Default -> English
   return "en";
 }
 
