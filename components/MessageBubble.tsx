@@ -320,8 +320,13 @@ export function MessageBubble({
     if (!autoPlayVoice || hasAutoPlayed) return;
     if (!ttsSupported) return;
 
-    play();
-    setHasAutoPlayed(true);
+    // Give the DOM a beat to settle (scroll/paint) and voices a chance to load.
+    // Keeps autoplay feeling smoother without changing any logic/controls.
+    const timer = window.setTimeout(() => {
+      play();
+      setHasAutoPlayed(true);
+    }, 140);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlayVoice, hasAutoPlayed, isAssistant, isTyping, ttsSupported]);
 
