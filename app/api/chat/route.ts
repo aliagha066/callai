@@ -32,6 +32,12 @@ function detectLocaleCategory(text: string): { category: LocaleCategory; confide
   // Azerbaijani Latin: ə / Ə (schwa) is the strongest single-character signal.
   if (/[\u0259\u018F]/.test(t)) return { category: "az", confident: true };
 
+  // Azerbaijani often appears in plain ASCII without diacritics (e.g. "salam necesen").
+  // Add a few high-signal, low-collision hints.
+  if (/\b(salam|necesen|nece\s*sen|azerbaycan|azərbaycan|sag\s*ol|sagol|xahis|xahi[sş])\b/i.test(t)) {
+    return { category: "az", confident: true };
+  }
+
   const turkishCharCount = (
     t.match(
       /[\u0131\u0130\u011F\u011E\u00FC\u00DC\u00F6\u00D6\u015F\u015E\u00E7\u00C7]/g,
