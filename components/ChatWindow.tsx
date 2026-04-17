@@ -368,6 +368,26 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     }
   }, [stopDirectVoice]);
 
+  const toggleDirectVoice = useCallback(() => {
+    setVoiceOutputUserActivated(true);
+
+    if (directVoiceRecRef.current || directVoiceListening) {
+      setDirectVoiceStoppedHint(true);
+      if (directVoiceHintTimerRef.current) {
+        clearTimeout(directVoiceHintTimerRef.current);
+        directVoiceHintTimerRef.current = null;
+      }
+      directVoiceHintTimerRef.current = setTimeout(() => {
+        setDirectVoiceStoppedHint(false);
+        directVoiceHintTimerRef.current = null;
+      }, 1200);
+      stopDirectVoice();
+      return;
+    }
+
+    startDirectVoice();
+  }, [directVoiceListening, startDirectVoice, stopDirectVoice]);
+
   useEffect(() => {
     return () => {
       stopDirectVoice();
@@ -1714,21 +1734,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               value={text}
               onChange={setText}
               onSend={send}
-              onVoicePressStart={() => {
-                startDirectVoice();
-              }}
-              onVoicePressEnd={() => {
-                setDirectVoiceStoppedHint(true);
-                if (directVoiceHintTimerRef.current) {
-                  clearTimeout(directVoiceHintTimerRef.current);
-                  directVoiceHintTimerRef.current = null;
-                }
-                directVoiceHintTimerRef.current = setTimeout(() => {
-                  setDirectVoiceStoppedHint(false);
-                  directVoiceHintTimerRef.current = null;
-                }, 1200);
-                stopDirectVoice();
-              }}
+              onVoiceMicToggle={toggleDirectVoice}
               onVoiceOpenPanelFallback={() => {
                 // Secondary path only (right click / long-press context menu).
                 setVoiceOutputUserActivated(true);

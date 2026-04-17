@@ -6,8 +6,7 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
-  onVoicePressStart?: () => void;
-  onVoicePressEnd?: () => void;
+  onVoiceMicToggle?: () => void;
   onVoiceOpenPanelFallback?: () => void;
   voiceListening?: boolean;
   voiceStatusText?: string | null;
@@ -20,8 +19,7 @@ export function ChatInput({
   value,
   onChange,
   onSend,
-  onVoicePressStart,
-  onVoicePressEnd,
+  onVoiceMicToggle,
   onVoiceOpenPanelFallback,
   voiceListening,
   voiceStatusText,
@@ -30,8 +28,6 @@ export function ChatInput({
   placeholder = "Type a message…",
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const pttActiveRef = useRef(false);
-  const pressStartedAtRef = useRef<number | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,63 +85,14 @@ export function ChatInput({
                 }}
               />
 
-              {onVoicePressStart || onVoiceOpenPanelFallback ? (
+              {onVoiceMicToggle || onVoiceOpenPanelFallback ? (
                 <div className="relative shrink-0">
                   <button
                     type="button"
-                    onPointerDown={(e) => {
-                      if (!onVoicePressStart) return;
-                      if (disabled) return;
-                      // Push-to-talk: press = start listening.
-                      pttActiveRef.current = true;
-                      pressStartedAtRef.current = Date.now();
-                      try {
-                        (e.currentTarget as HTMLButtonElement).setPointerCapture(
-                          e.pointerId,
-                        );
-                      } catch {
-                        // ignore
-                      }
-                      e.preventDefault();
-                      onVoicePressStart();
-                    }}
-                    onPointerUp={(e) => {
-                      if (!onVoicePressEnd) return;
-                      if (!pttActiveRef.current) return;
-                      const startedAt = pressStartedAtRef.current;
-                      pressStartedAtRef.current = null;
-                      pttActiveRef.current = false;
-                      try {
-                        (e.currentTarget as HTMLButtonElement).releasePointerCapture(
-                          e.pointerId,
-                        );
-                      } catch {
-                        // ignore
-                      }
-                      e.preventDefault();
-                      // If it was a quick tap, keep listening and let recognition end naturally.
-                      const heldForMs = startedAt ? Date.now() - startedAt : 9999;
-                      if (heldForMs >= 260) {
-                        // Release after hold = stop listening (existing flow continues: processing/sending).
-                        onVoicePressEnd();
-                      }
-                    }}
-                    onPointerCancel={() => {
-                      if (!onVoicePressEnd) return;
-                      if (!pttActiveRef.current) return;
-                      pttActiveRef.current = false;
-                      pressStartedAtRef.current = null;
-                      onVoicePressEnd();
-                    }}
                     onClick={() => {
-                      // Pointer up triggers click; ignore those.
-                      if (pttActiveRef.current) return;
-                      // Tap behavior: start listening (primary flow).
-                      if (onVoicePressStart) {
-                        onVoicePressStart();
-                        return;
-                      }
+                      if (!onVoiceMicToggle) return;
                       if (disabled) return;
+                      onVoiceMicToggle();
                     }}
                     onContextMenu={(e) => {
                       if (!onVoiceOpenPanelFallback) return;
@@ -166,9 +113,7 @@ export function ChatInput({
                     ].join(" ")}
                     aria-label={voiceListening ? "Stop voice input" : "Voice input"}
                     title={
-                      onVoicePressStart
-                        ? "Hold to talk"
-                        : "Voice input"
+                      onVoiceMicToggle ? "Tap to toggle voice input" : "Voice input"
                     }
                   >
                     <span className="text-[18px] leading-none">{"\u{1F3A4}"}</span>
