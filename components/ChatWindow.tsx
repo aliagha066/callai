@@ -966,10 +966,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
     // Lightweight long-term memory: extract a few safe facts from REAL user text.
     // Stored locally per-user (or guest) and optionally sent as extra context.
+    let mergedFactsForThisTurn = memoryFacts;
     try {
       const extracted = extractMemoryFactsFromUserText(content);
       if (extracted.length) {
-        setMemoryFacts((prev) => mergeMemoryFacts(prev, extracted));
+        mergedFactsForThisTurn = mergeMemoryFacts(memoryFacts, extracted);
+        setMemoryFacts(mergedFactsForThisTurn);
       }
     } catch {
       // ignore memory failures
@@ -986,7 +988,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     // Lightweight recent context for the assistant (no extra storage).
     const recentMessages = messages
       .filter((m) => m.id !== TYPING_ID)
-      .slice(-8)
+      .slice(-10)
       .map((m) => ({
         role: m.role,
         content: m.content,
@@ -1053,7 +1055,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
           userDisplayName: userDisplayName ?? undefined,
           chatTitle: currentChatTitle,
           recentMessages,
-          longTermMemory: memoryFacts,
+          longTermMemory: mergedFactsForThisTurn,
           companionMode,
           responseStyle,
           preferredLanguage,
@@ -1113,9 +1115,9 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     isAuthed,
     isLoading,
     messages,
+    memoryFacts,
     preferredLanguage,
     responseStyle,
-    memoryFacts,
     text,
     updateActiveChat,
     user,

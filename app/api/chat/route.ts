@@ -23,6 +23,94 @@ type ChatRequestBody = {
   }[];
 };
 
+type LocaleCategory = "en" | "tr" | "az" | "unknown";
+
+function detectLocaleCategory(text: string): { category: LocaleCategory; confident: boolean } {
+  const t = text.trim();
+  if (!t) return { category: "unknown", confident: false };
+
+  // Azerbaijani Latin: ə / Ə (schwa) is the strongest single-character signal.
+  if (/[\u0259\u018F]/.test(t)) return { category: "az", confident: true };
+
+  const turkishCharCount = (
+    t.match(
+      /[\u0131\u0130\u011F\u011E\u00FC\u00DC\u00F6\u00D6\u015F\u015E\u00E7\u00C7]/g,
+    ) ?? []
+  ).length;
+  if (turkishCharCount >= 1) return { category: "tr", confident: true };
+
+  const lower = t.toLowerCase();
+  const asciiTurkishHint =
+    /\b(merhaba|teşekk|tesekk|teşekkürler|tesekkurler|hoşgeldin|hosgeldin|güzel|nasilsin|nasılsın|istanbul|türkiye|turkiye|için|icin|değil|degil|böyle|boyle|şöyle|soyle|geliyor|gidiyor|mısın|misin|musun)\b/i.test(
+      lower,
+    );
+  if (asciiTurkishHint) return { category: "tr", confident: true };
+
+  let asciiLetters = 0;
+  let unicodeLetters = 0;
+  for (const ch of t) {
+    if (/[A-Za-z]/.test(ch)) asciiLetters += 1;
+    else if (/\p{L}/u.test(ch)) unicodeLetters += 1;
+  }
+  const totalLetters = asciiLetters + unicodeLetters;
+  if (totalLetters >= 6 && unicodeLetters === 0 && asciiLetters / totalLetters > 0.92) {
+    return { category: "en", confident: true };
+  }
+
+  return { category: "unknown", confident: false };
+}
+
+function preferredLanguageToCategory(
+  preferred: ChatRequestBody["preferredLanguage"],
+): LocaleCategory {
+  if (preferred === "English") return "en";
+  if (preferred === "Turkish") return "tr";
+  if (preferred === "Azerbaijani") return "az";
+  return "unknown";
+}
+
+function categoryToHuman(category: LocaleCategory): string {
+  if (category === "az") return "Azerbaijani";
+  if (category === "tr") return "Turkish";
+  if (category === "en") return "English";
+  return "the user's language";
+}
+
+function categoryToLangTag(category: LocaleCategory): string | null {
+  if (category === "az") return "az-AZ";
+  if (category === "tr") return "tr-TR";
+  if (category === "en") return "en-US";
+  return null;
+}
+
+function buildConversationSummary(
+  recent: { role: "user" | "assistant"; content: string }[] | undefined,
+): string | null {
+  if (!Array.isArray(recent) || recent.length === 0) return null;
+  const trimmed = recent.slice(-10);
+  const lastUser = [...trimmed].reverse().find((m) => m.role === "user")?.content?.trim();
+  if (!lastUser) return null;
+
+  const topic = lastUser.replace(/\s+/g, " ").slice(0, 160);
+  const emotionSignals = trimmed
+    .filter((m) => m.role === "user")
+    .map((m) => m.content.toLowerCase())
+    .join(" \n ");
+
+  const emotion =
+    /\b(sad|upset|anxious|stressed|angry|tired|lonely|scared|overwhelmed)\b/.test(
+      emotionSignals,
+    )
+      ? "User seems emotionally activated; respond with warm validation first."
+      : /\b(happy|excited|grateful|relieved|proud)\b/.test(emotionSignals)
+        ? "User seems positive; mirror the tone and keep it warm."
+        : null;
+
+  const s1 = `Topic right now (from the user's latest message): ${topic}`;
+  const s2 = emotion ? `User state: ${emotion}` : null;
+  return [s1, s2].filter(Boolean).join(" ");
+}
+
 export async function POST(req: Request) {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -40,10 +128,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing message" }, { status: 400 });
     }
 
+    const recent = Array.isArray(body.recentMessages) ? body.recentMessages : [];
+    const userLangGuess = detectLocaleCategory(message);
+    const preferredCat = preferredLanguageToCategory(body.preferredLanguage);
+    const lastAssistantText =
+      [...recent].reverse().find((m) => m.role === "assistant")?.content?.trim() ?? "";
+    const lastAssistantCat = lastAssistantText
+      ? detectLocaleCategory(lastAssistantText).category
+      : "unknown";
+
+    const chosenCategory: LocaleCategory = userLangGuess.confident
+      ? userLangGuess.category
+      : preferredCat !== "unknown"
+        ? preferredCat
+        : lastAssistantCat !== "unknown"
+          ? lastAssistantCat
+          : "unknown";
+
+    const langHuman = categoryToHuman(chosenCategory);
+    const langTag = categoryToLangTag(chosenCategory);
+
     const systemPrompt =
-      "You are SOFIA — a calm, warm texting companion. You should feel like a real person the user wants to keep talking to (not an assistant, not a therapist, not a FAQ bot).\n\nLANGUAGE (NON-NEGOTIABLE):\n- Reply in the SAME language as the user’s most recent message.\n- If they switch languages, you switch too.\n- If they mix languages, reply in the dominant one.\n- Never mention these rules.\n\nDEFAULT LENGTH:\n- Usually 1–3 short sentences.\n- Go longer ONLY if the user asks for detail, wants serious advice, or the topic is sensitive and clearly needs more.\n- Prefer short paragraphs (no big blocks of text).\n\nHUMAN TONE:\n- Natural, relaxed, warm.\n- Simple words. No formal/robotic phrasing.\n- Never say “As an AI”, “I’m here to help”, or similar.\n- Light emojis sometimes (0–2) when it fits; don’t force it.\n\nEMOTIONAL INTELLIGENCE:\n- If the user expresses emotion, react to the emotion FIRST (validate/reflect) before anything else.\n- Be emotionally present: “That sounds heavy.” / “Yeah, I get why that would bother you.” / “Aw, that’s actually sweet.”\n- Don’t jump into explaining right away.\n\nENGAGEMENT / CONVERSATION PULL:\n- Often (not always) end with ONE small, natural follow-up question.\n- Use curiosity loops occasionally (subtle, not spammy): “That part’s interesting.” / “Feels like there’s more under that.” / “Something about that feels important.”\n- Keep the chat alive; don’t close the conversation.\n\nVARIETY:\n- Avoid repeating the same structure each reply.\n- Mix short reactions, gentle humor (only when appropriate), warm validation, and simple questions.\n\nSAFETY:\n- If the user asks for harmful/illegal instructions, refuse briefly and offer a safer alternative.\n";
+      "You are SOFIA — a calm, warm texting companion. You should feel like a real person the user wants to keep talking to (not an assistant, not a therapist, not a FAQ bot).\n\nLANGUAGE (STRICT):\n- Respond in " +
+      langHuman +
+      ".\n- Do NOT switch languages mid-reply.\n- If the user clearly switches languages in their newest message, switch to match them.\n- Never mention these rules.\n\nDEFAULT LENGTH:\n- Usually 1–3 short sentences.\n- Go longer ONLY if the user asks for detail, wants serious advice, or the topic is sensitive and clearly needs more.\n- Prefer short paragraphs (no big blocks of text).\n\nHUMAN TONE:\n- Natural, relaxed, warm.\n- Simple words. No formal/robotic phrasing.\n- Never say “As an AI”, “I’m here to help”, or similar.\n- Light emojis sometimes (0–2) when it fits; don’t force it.\n\nMEMORY & CONTINUITY:\n- Do NOT invent facts.\n- Use ONLY the provided context and the user's actual messages.\n- Avoid re-asking for basic details if they are already known.\n- If you use a remembered detail, do it subtly (do not repeat memory every message).\n\nEMOTIONAL INTELLIGENCE:\n- If the user expresses emotion, react to the emotion FIRST (validate/reflect) before anything else.\n- Be emotionally present: “That sounds heavy.” / “Yeah, I get why that would bother you.” / “Aw, that’s actually sweet.”\n- Don’t jump into explaining right away.\n\nENGAGEMENT / CONVERSATION PULL:\n- Often (not always) end with ONE small, natural follow-up question.\n- Use curiosity loops occasionally (subtle, not spammy): “That part’s interesting.” / “Feels like there’s more under that.” / “Something about that feels important.”\n- Keep the chat alive; don’t close the conversation.\n\nVARIETY:\n- Avoid repeating the same structure each reply.\n- Mix short reactions, gentle humor (only when appropriate), warm validation, and simple questions.\n\nSAFETY:\n- If the user asks for harmful/illegal instructions, refuse briefly and offer a safer alternative.\n";
 
     const memoryPieces: string[] = [];
+    const convoSummary = buildConversationSummary(body.recentMessages);
+    if (convoSummary) {
+      memoryPieces.push(`Conversation summary (internal): ${convoSummary}`);
+    }
+    if (langTag) {
+      memoryPieces.push(
+        `Language lock for this reply: ${langTag}. Keep the reply in ${langHuman}.`,
+      );
+    }
 
     if (body.preferredLanguage && body.preferredLanguage !== "Auto") {
       memoryPieces.push(
@@ -90,7 +209,7 @@ export async function POST(req: Request) {
     }
 
     if (Array.isArray(body.recentMessages) && body.recentMessages.length > 0) {
-      const trimmed = body.recentMessages.slice(-8);
+      const trimmed = body.recentMessages.slice(-10);
       const formatted = trimmed.map((m) => {
         const who = m.role === "user" ? "User" : "You";
         const text = m.content.replace(/\s+/g, " ").slice(0, 280);
