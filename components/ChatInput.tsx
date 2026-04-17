@@ -27,6 +27,13 @@ export function ChatInput({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (disabled) return;
+    if (value.trim().length === 0) return;
+    onSend();
+  }
+
   useEffect(() => {
     if (!textareaRef.current) return;
     textareaRef.current.style.height = "0px";
@@ -54,7 +61,10 @@ export function ChatInput({
     <div className="w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/5 bg-black/35 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
       <div className="w-full max-w-full overflow-x-hidden px-3">
         <div className="mx-auto w-full max-w-4xl py-4 sm:px-1 sm:py-4">
-          <div className="flex w-full max-w-full min-w-0 items-center gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200">
+          <form
+            className="flex w-full max-w-full min-w-0 items-center gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200"
+            onSubmit={handleSubmit}
+          >
             <textarea
               ref={textareaRef}
               value={value}
@@ -131,8 +141,7 @@ export function ChatInput({
             ) : null}
 
             <button
-              type="button"
-              onClick={onSend}
+              type="submit"
               disabled={disabled || value.trim().length === 0}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sm font-semibold text-white ring-1 ring-white/10 shadow-[0_0_20px_rgba(99,102,241,0.08)] transition-all duration-200 hover:bg-white/14 hover:ring-white/20 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Send message"
@@ -140,7 +149,7 @@ export function ChatInput({
             >
               <span className="translate-x-[1px]">↵</span>
             </button>
-          </div>
+          </form>
         </div>
 
         <div className="mx-auto w-full max-w-4xl mt-2 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">

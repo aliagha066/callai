@@ -23,61 +23,34 @@ type ChatRequestBody = {
   }[];
 };
 
-type LocaleCategory = "en" | "tr" | "az" | "ru" | "unknown";
+type LocaleCategory = "en" | "tr" | "az" | "ru";
 
-function detectLocaleCategory(text: string): { category: LocaleCategory; confident: boolean } {
-  const t = text.trim();
-  if (!t) return { category: "unknown", confident: false };
+type ForcedLanguage = "en" | "tr" | "az" | "ru";
 
-  // Cyrillic rule: if the latest user message contains Cyrillic letters, reply in Russian.
-  // Covers Russian and other Cyrillic-using text; per product requirement we treat it as Russian.
-  if (/[\u0400-\u04FF]/.test(t)) return { category: "ru", confident: true };
+function detectForcedLanguageFromLatestMessage(message: string): ForcedLanguage {
+  const t = message.trim();
+  // 1) Cyrillic -> Russian
+  if (/[\u0400-\u04FF]/.test(t)) return "ru";
 
-  // Azerbaijani Latin: ə / Ə (schwa) is the strongest single-character signal.
-  if (/[\u0259\u018F]/.test(t)) return { category: "az", confident: true };
-
-  // Azerbaijani often appears in plain ASCII without diacritics (e.g. "salam necesen").
-  // Add a few high-signal, low-collision hints.
-  if (/\b(salam|necesen|nece\s*sen|azerbaycan|azərbaycan|sag\s*ol|sagol|xahis|xahi[sş])\b/i.test(t)) {
-    return { category: "az", confident: true };
+  // 2) Azerbaijani strong signals: ə/Ə always wins; plus common AZ words.
+  if (/[\u0259\u018F]/.test(t)) return "az";
+  if (/\b(nec\u0259|nec\u0259s\u0259n|salam|azerbaycan|az\u0259rbaycan|sa\u011Fol|sagol)\b/i.test(t)) {
+    return "az";
   }
 
-  const turkishCharCount = (
-    t.match(
-      /[\u0131\u0130\u011F\u011E\u00FC\u00DC\u00F6\u00D6\u015F\u015E\u00E7\u00C7]/g,
-    ) ?? []
-  ).length;
-  if (turkishCharCount >= 1) return { category: "tr", confident: true };
-
-  const lower = t.toLowerCase();
-  const asciiTurkishHint =
-    /\b(merhaba|teşekk|tesekk|teşekkürler|tesekkurler|hoşgeldin|hosgeldin|güzel|nasilsin|nasılsın|istanbul|türkiye|turkiye|için|icin|değil|degil|böyle|boyle|şöyle|soyle|geliyor|gidiyor|mısın|misin|musun)\b/i.test(
-      lower,
-    );
-  if (asciiTurkishHint) return { category: "tr", confident: true };
-
-  let asciiLetters = 0;
-  let unicodeLetters = 0;
-  for (const ch of t) {
-    if (/[A-Za-z]/.test(ch)) asciiLetters += 1;
-    else if (/\p{L}/u.test(ch)) unicodeLetters += 1;
+  // 3) Turkish signals: dotted/dotless i and Turkish-specific letters; plus common words.
+  if (
+    /[\u0131\u0130\u011F\u011E\u00FC\u00DC\u00F6\u00D6\u015F\u015E\u00E7\u00C7]/.test(t)
+  ) {
+    return "tr";
   }
-  const totalLetters = asciiLetters + unicodeLetters;
-  if (totalLetters >= 6 && unicodeLetters === 0 && asciiLetters / totalLetters > 0.92) {
-    return { category: "en", confident: true };
-  }
+  if (/\b(nas\u0131l|nas\u0131ls\u0131n|merhaba)\b/i.test(t)) return "tr";
 
-  return { category: "unknown", confident: false };
+  // 4) Default -> English
+  return "en";
 }
 
-function preferredLanguageToCategory(
-  preferred: ChatRequestBody["preferredLanguage"],
-): LocaleCategory {
-  if (preferred === "English") return "en";
-  if (preferred === "Turkish") return "tr";
-  if (preferred === "Azerbaijani") return "az";
-  return "unknown";
-}
+// NOTE: language enforcement is done via `detectForcedLanguageFromLatestMessage()`.
 
 function categoryToHuman(category: LocaleCategory): string {
   if (category === "az") return "Azerbaijani";
@@ -141,24 +114,25 @@ export async function POST(req: Request) {
     }
 
     const recent = Array.isArray(body.recentMessages) ? body.recentMessages : [];
-    const userLangGuess = detectLocaleCategory(message);
-    const preferredCat = preferredLanguageToCategory(body.preferredLanguage);
+    const forcedLang = detectForcedLanguageFromLatestMessage(message);
     const lastAssistantText =
       [...recent].reverse().find((m) => m.role === "assistant")?.content?.trim() ?? "";
-    const lastAssistantCat = lastAssistantText
-      ? detectLocaleCategory(lastAssistantText).category
-      : "unknown";
+    void lastAssistantText;
 
-    const chosenCategory: LocaleCategory = userLangGuess.confident
-      ? userLangGuess.category
-      : preferredCat !== "unknown"
-        ? preferredCat
-        : lastAssistantCat !== "unknown"
-          ? lastAssistantCat
-          : "unknown";
+    // STRICT RULE: latest user message wins. We compute a category/tag for enforcement text only.
+    const chosenCategory: LocaleCategory = forcedLang;
 
     const langHuman = categoryToHuman(chosenCategory);
     const langTag = categoryToLangTag(chosenCategory);
+
+    const languageEnforcement =
+      forcedLang === "tr"
+        ? "You MUST reply ONLY in Turkish."
+        : forcedLang === "az"
+          ? "You MUST reply ONLY in Azerbaijani."
+          : forcedLang === "ru"
+            ? "You MUST reply ONLY in Russian."
+            : "You MUST reply ONLY in English.";
 
     const systemPrompt =
       "You are SOFIA — a calm, warm texting companion. You should feel like a real person the user wants to keep talking to (not an assistant, not a therapist, not a FAQ bot).\n\nLANGUAGE (STRICT, NON-NEGOTIABLE):\n- ALWAYS answer in the language of the user's MOST RECENT message.\n- For THIS reply, answer in " +
@@ -170,6 +144,7 @@ export async function POST(req: Request) {
     if (convoSummary) {
       memoryPieces.push(`Conversation summary (internal): ${convoSummary}`);
     }
+    memoryPieces.push(`Language enforcement (do not mention): ${languageEnforcement}`);
     if (langTag) {
       memoryPieces.push(
         `Language lock for this reply: ${langTag}. Keep the reply in ${langHuman}.`,
