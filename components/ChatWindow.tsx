@@ -216,11 +216,21 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const [directVoiceUnavailableHint, setDirectVoiceUnavailableHint] =
     useState(false);
   const [directVoiceStoppedHint, setDirectVoiceStoppedHint] = useState(false);
+  const [directVoiceSettling, setDirectVoiceSettling] = useState(false);
   const directVoiceHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const directVoiceSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const directVoiceSettleHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
   const directVoiceRecRef = useRef<SpeechRecognitionLike | null>(null);
   const directVoicePreviewRef = useRef("");
+  const finalVoiceTranscriptRef = useRef("");
+  const lastInterimTranscriptRef = useRef("");
+  const manualVoiceStopRef = useRef(false);
   const sendRef = useRef<(overrideContent?: string) => void | Promise<void>>(
     () => {},
   );
@@ -273,6 +283,16 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   }, [messages]);
 
   const stopDirectVoice = useCallback(() => {
+    if (directVoiceSettleHintTimerRef.current) {
+      clearTimeout(directVoiceSettleHintTimerRef.current);
+      directVoiceSettleHintTimerRef.current = null;
+    }
+    if (directVoiceSilenceTimerRef.current) {
+      clearTimeout(directVoiceSilenceTimerRef.current);
+      directVoiceSilenceTimerRef.current = null;
+    }
+    setDirectVoiceSettling(false);
+
     const rec = directVoiceRecRef.current;
     if (!rec) return;
     setDirectVoiceProcessing(true);
@@ -305,7 +325,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     setTtsSpeakingMessageId(null);
 
     const rec = createSpeechRecognition({
-      continuous: false,
+      // Continuous + debounced finalize tolerates short natural pauses.
+      continuous: true,
       interimResults: true,
     });
     if (!rec) {
@@ -325,19 +346,77 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     setDirectVoiceUnavailableHint(false);
     setDirectVoiceStoppedHint(false);
     directVoicePreviewRef.current = "";
+    finalVoiceTranscriptRef.current = "";
+    lastInterimTranscriptRef.current = "";
+    if (directVoiceSilenceTimerRef.current) {
+      clearTimeout(directVoiceSilenceTimerRef.current);
+      directVoiceSilenceTimerRef.current = null;
+    }
+    if (directVoiceSettleHintTimerRef.current) {
+      clearTimeout(directVoiceSettleHintTimerRef.current);
+      directVoiceSettleHintTimerRef.current = null;
+    }
+    setDirectVoiceSettling(false);
+
+    function scheduleSilenceFinalize() {
+      if (directVoiceSilenceTimerRef.current) {
+        clearTimeout(directVoiceSilenceTimerRef.current);
+        directVoiceSilenceTimerRef.current = null;
+      }
+      if (directVoiceSettleHintTimerRef.current) {
+        clearTimeout(directVoiceSettleHintTimerRef.current);
+        directVoiceSettleHintTimerRef.current = null;
+      }
+
+      // First: short quiet period (tolerates natural micro-pauses while speaking).
+      // Second: longer finalize window after the "finishing" hint.
+      directVoiceSettleHintTimerRef.current = setTimeout(() => {
+        directVoiceSettleHintTimerRef.current = null;
+        setDirectVoiceSettling(true);
+        directVoiceSilenceTimerRef.current = setTimeout(() => {
+          directVoiceSilenceTimerRef.current = null;
+          setDirectVoiceSettling(false);
+          // End session after sustained quiet (user likely finished speaking).
+          stopDirectVoice();
+        }, 900);
+      }, 450);
+    }
 
     rec.onresult = (event: SpeechRecognitionResultLike) => {
-      let transcript = "";
       const results = event.results;
+      let interim = "";
       for (let i = 0; i < results.length; i++) {
-        transcript += results[i]?.[0]?.transcript ?? "";
+        const r = results[i];
+        const piece = r?.[0]?.transcript ?? "";
+        const isFinal = !!r?.isFinal;
+        if (isFinal) {
+          finalVoiceTranscriptRef.current += piece;
+        } else {
+          interim += piece;
+        }
       }
-      directVoicePreviewRef.current = transcript.trim();
+
+      const finals = finalVoiceTranscriptRef.current.trim();
+      const live = interim.trim();
+      lastInterimTranscriptRef.current = live;
+      directVoicePreviewRef.current = `${finals}${finals && live ? " " : ""}${live}`.trim();
+
+      // Any new audio/text activity resets the pause timer.
+      scheduleSilenceFinalize();
     };
 
     rec.onerror = (event: SpeechRecognitionErrorLike) => {
       if (event.error === "aborted") return;
       if (event.error === "no-speech") return;
+      if (directVoiceSilenceTimerRef.current) {
+        clearTimeout(directVoiceSilenceTimerRef.current);
+        directVoiceSilenceTimerRef.current = null;
+      }
+      if (directVoiceSettleHintTimerRef.current) {
+        clearTimeout(directVoiceSettleHintTimerRef.current);
+        directVoiceSettleHintTimerRef.current = null;
+      }
+      setDirectVoiceSettling(false);
       stopDirectVoice();
       setVoiceInputOpen(true);
     };
@@ -345,14 +424,37 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     rec.onstart = () => {
       setDirectVoiceListening(true);
       setDirectVoiceProcessing(false);
+      // Start pause detection once listening begins.
+      scheduleSilenceFinalize();
     };
 
     rec.onend = () => {
       setDirectVoiceListening(false);
       setDirectVoiceProcessing(false);
       directVoiceRecRef.current = null;
-      const latest = directVoicePreviewRef.current.trim();
+      if (directVoiceSilenceTimerRef.current) {
+        clearTimeout(directVoiceSilenceTimerRef.current);
+        directVoiceSilenceTimerRef.current = null;
+      }
+      if (directVoiceSettleHintTimerRef.current) {
+        clearTimeout(directVoiceSettleHintTimerRef.current);
+        directVoiceSettleHintTimerRef.current = null;
+      }
+      setDirectVoiceSettling(false);
+
+      const finals = finalVoiceTranscriptRef.current.trim();
+      const live = lastInterimTranscriptRef.current.trim();
+      const manual = manualVoiceStopRef.current;
+      manualVoiceStopRef.current = false;
+
+      const latest = (finals || (manual ? live : "")).trim();
       if (!latest) return;
+
+      // Auto end: prefer finalized segments; avoid sending unstable interim-only captures.
+      if (!manual) {
+        if (!finals) return;
+      }
+
       setDirectVoiceSending(true);
       Promise.resolve(sendRef.current(latest)).finally(() => {
         setDirectVoiceSending(false);
@@ -372,6 +474,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     setVoiceOutputUserActivated(true);
 
     if (directVoiceRecRef.current || directVoiceListening) {
+      manualVoiceStopRef.current = true;
       setDirectVoiceStoppedHint(true);
       if (directVoiceHintTimerRef.current) {
         clearTimeout(directVoiceHintTimerRef.current);
@@ -385,6 +488,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       return;
     }
 
+    manualVoiceStopRef.current = false;
     startDirectVoice();
   }, [directVoiceListening, startDirectVoice, stopDirectVoice]);
 
@@ -394,6 +498,14 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       if (directVoiceHintTimerRef.current) {
         clearTimeout(directVoiceHintTimerRef.current);
         directVoiceHintTimerRef.current = null;
+      }
+      if (directVoiceSettleHintTimerRef.current) {
+        clearTimeout(directVoiceSettleHintTimerRef.current);
+        directVoiceSettleHintTimerRef.current = null;
+      }
+      if (directVoiceSilenceTimerRef.current) {
+        clearTimeout(directVoiceSilenceTimerRef.current);
+        directVoiceSilenceTimerRef.current = null;
       }
     };
   }, [stopDirectVoice]);
@@ -413,6 +525,15 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     setDirectVoiceSending(false);
     setDirectVoiceUnavailableHint(false);
     setDirectVoiceStoppedHint(false);
+    setDirectVoiceSettling(false);
+    if (directVoiceSettleHintTimerRef.current) {
+      clearTimeout(directVoiceSettleHintTimerRef.current);
+      directVoiceSettleHintTimerRef.current = null;
+    }
+    if (directVoiceSilenceTimerRef.current) {
+      clearTimeout(directVoiceSilenceTimerRef.current);
+      directVoiceSilenceTimerRef.current = null;
+    }
   }, [activeChatId, stopDirectVoice]);
 
   const handleTtsStart = useCallback((id: string) => {
@@ -428,6 +549,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     if (directVoiceStoppedHint) return "Stopped";
     if (directVoiceSending) return "Sending…";
     if (directVoiceProcessing) return "Processing…";
+    if (directVoiceSettling) return "Finishing…";
     if (directVoiceListening) return "Listening…";
     if (ttsSpeakingMessageId) return "Speaking…";
     return null;
@@ -435,6 +557,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     directVoiceListening,
     directVoiceProcessing,
     directVoiceSending,
+    directVoiceSettling,
     directVoiceStoppedHint,
     directVoiceUnavailableHint,
     ttsSpeakingMessageId,
