@@ -6,6 +6,7 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  onVoiceInput?: () => void;
   disabled?: boolean;
   placeholder?: string;
 };
@@ -14,6 +15,7 @@ export function ChatInput({
   value,
   onChange,
   onSend,
+  onVoiceInput,
   disabled,
   placeholder = "Type a message…",
 }: Props) {
@@ -63,6 +65,19 @@ export function ChatInput({
                 }
               }}
             />
+
+            {onVoiceInput ? (
+              <button
+                type="button"
+                onClick={onVoiceInput}
+                disabled={disabled}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-white/80 ring-1 ring-white/10 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/10 hover:text-white/90 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Voice input"
+                title="Voice input"
+              >
+                <span className="text-[18px] leading-none">{"\u{1F3A4}"}</span>
+              </button>
+            ) : null}
 
             <button
               type="button"

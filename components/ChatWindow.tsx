@@ -1509,6 +1509,10 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               value={text}
               onChange={setText}
               onSend={send}
+              onVoiceInput={() => {
+                setVoiceOutputUserActivated(true);
+                setVoiceInputOpen(true);
+              }}
               disabled={isLoading}
               placeholder={isLoading ? `${aiName} is writing…` : undefined}
             />
