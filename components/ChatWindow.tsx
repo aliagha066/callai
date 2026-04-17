@@ -432,6 +432,13 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     ttsSpeakingMessageId,
   ]);
 
+  const voiceStatusKind = useMemo(() => {
+    if (directVoiceListening) return "listening" as const;
+    if (directVoiceProcessing || directVoiceSending) return "working" as const;
+    if (ttsSpeakingMessageId) return "speaking" as const;
+    return "idle" as const;
+  }, [directVoiceListening, directVoiceProcessing, directVoiceSending, ttsSpeakingMessageId]);
+
   const filteredChats = useMemo(() => {
     const q = chatSearch.trim().toLowerCase();
     const base = q
@@ -1728,6 +1735,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               }}
               voiceListening={directVoiceListening}
               voiceStatusText={voiceStatusText}
+              voiceStatusKind={voiceStatusKind}
               disabled={isLoading}
               placeholder={isLoading ? `${aiName} is writing…` : undefined}
             />
