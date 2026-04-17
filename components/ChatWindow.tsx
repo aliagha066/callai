@@ -211,6 +211,14 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
   const [directVoiceListening, setDirectVoiceListening] = useState(false);
+  const [directVoiceProcessing, setDirectVoiceProcessing] = useState(false);
+  const [directVoiceSending, setDirectVoiceSending] = useState(false);
+  const [directVoiceUnavailableHint, setDirectVoiceUnavailableHint] =
+    useState(false);
+  const [directVoiceStoppedHint, setDirectVoiceStoppedHint] = useState(false);
+  const directVoiceHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const directVoiceRecRef = useRef<SpeechRecognitionLike | null>(null);
   const directVoicePreviewRef = useRef("");
   const sendRef = useRef<(overrideContent?: string) => void | Promise<void>>(
@@ -267,6 +275,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const stopDirectVoice = useCallback(() => {
     const rec = directVoiceRecRef.current;
     if (!rec) return;
+    setDirectVoiceProcessing(true);
     try {
       rec.stop();
     } catch {
@@ -284,19 +293,49 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     setVoiceOutputUserActivated(true);
 
     if (directVoiceRecRef.current) {
+      setDirectVoiceStoppedHint(true);
+      if (directVoiceHintTimerRef.current) {
+        clearTimeout(directVoiceHintTimerRef.current);
+        directVoiceHintTimerRef.current = null;
+      }
+      directVoiceHintTimerRef.current = setTimeout(() => {
+        setDirectVoiceStoppedHint(false);
+        directVoiceHintTimerRef.current = null;
+      }, 1200);
       stopDirectVoice();
       return;
     }
+
+    // If AI is speaking, interrupt it before listening (call-like feel).
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {
+      // ignore
+    }
+    setTtsSpeakingMessageId(null);
 
     const rec = createSpeechRecognition({
       continuous: false,
       interimResults: true,
     });
     if (!rec) {
+      setDirectVoiceUnavailableHint(true);
+      if (directVoiceHintTimerRef.current) {
+        clearTimeout(directVoiceHintTimerRef.current);
+        directVoiceHintTimerRef.current = null;
+      }
+      directVoiceHintTimerRef.current = setTimeout(() => {
+        setDirectVoiceUnavailableHint(false);
+        directVoiceHintTimerRef.current = null;
+      }, 1400);
       setVoiceInputOpen(true);
       return;
     }
 
+    setDirectVoiceUnavailableHint(false);
+    setDirectVoiceStoppedHint(false);
     directVoicePreviewRef.current = "";
 
     rec.onresult = (event: SpeechRecognitionResultLike) => {
@@ -317,14 +356,19 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
     rec.onstart = () => {
       setDirectVoiceListening(true);
+      setDirectVoiceProcessing(false);
     };
 
     rec.onend = () => {
       setDirectVoiceListening(false);
+      setDirectVoiceProcessing(false);
       directVoiceRecRef.current = null;
       const latest = directVoicePreviewRef.current.trim();
       if (!latest) return;
-      void sendRef.current(latest);
+      setDirectVoiceSending(true);
+      Promise.resolve(sendRef.current(latest)).finally(() => {
+        setDirectVoiceSending(false);
+      });
     };
 
     directVoiceRecRef.current = rec;
@@ -339,6 +383,10 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   useEffect(() => {
     return () => {
       stopDirectVoice();
+      if (directVoiceHintTimerRef.current) {
+        clearTimeout(directVoiceHintTimerRef.current);
+        directVoiceHintTimerRef.current = null;
+      }
     };
   }, [stopDirectVoice]);
 
@@ -352,6 +400,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     }
     setTtsSpeakingMessageId(null);
     stopDirectVoice();
+    setDirectVoiceListening(false);
+    setDirectVoiceProcessing(false);
+    setDirectVoiceSending(false);
+    setDirectVoiceUnavailableHint(false);
+    setDirectVoiceStoppedHint(false);
   }, [activeChatId, stopDirectVoice]);
 
   const handleTtsStart = useCallback((id: string) => {
@@ -361,6 +414,23 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const handleTtsEnd = useCallback((id: string) => {
     setTtsSpeakingMessageId((prev) => (prev === id ? null : prev));
   }, []);
+
+  const voiceStatusText = useMemo(() => {
+    if (directVoiceUnavailableHint) return "Voice unavailable";
+    if (directVoiceStoppedHint) return "Stopped";
+    if (directVoiceSending) return "Sending…";
+    if (directVoiceProcessing) return "Processing…";
+    if (directVoiceListening) return "Listening…";
+    if (ttsSpeakingMessageId) return "Speaking…";
+    return null;
+  }, [
+    directVoiceListening,
+    directVoiceProcessing,
+    directVoiceSending,
+    directVoiceStoppedHint,
+    directVoiceUnavailableHint,
+    ttsSpeakingMessageId,
+  ]);
 
   const filteredChats = useMemo(() => {
     const q = chatSearch.trim().toLowerCase();
@@ -1657,6 +1727,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                 setVoiceInputOpen(true);
               }}
               voiceListening={directVoiceListening}
+              voiceStatusText={voiceStatusText}
               disabled={isLoading}
               placeholder={isLoading ? `${aiName} is writing…` : undefined}
             />

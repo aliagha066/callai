@@ -9,6 +9,7 @@ type Props = {
   onVoiceInput?: () => void;
   onVoiceLongPress?: () => void;
   voiceListening?: boolean;
+  voiceStatusText?: string | null;
   disabled?: boolean;
   placeholder?: string;
 };
@@ -20,6 +21,7 @@ export function ChatInput({
   onVoiceInput,
   onVoiceLongPress,
   voiceListening,
+  voiceStatusText,
   disabled,
   placeholder = "Type a message…",
 }: Props) {
@@ -84,9 +86,9 @@ export function ChatInput({
 
             {onVoiceInput ? (
               <div className="relative shrink-0">
-                {voiceListening ? (
+                {voiceStatusText ? (
                   <span className="pointer-events-none absolute -top-5 right-0 select-none text-[11px] font-medium text-indigo-200/85">
-                    Listening…
+                    {voiceStatusText}
                   </span>
                 ) : null}
                 <button
