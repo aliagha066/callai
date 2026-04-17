@@ -292,19 +292,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const startDirectVoice = useCallback(() => {
     setVoiceOutputUserActivated(true);
 
-    if (directVoiceRecRef.current) {
-      setDirectVoiceStoppedHint(true);
-      if (directVoiceHintTimerRef.current) {
-        clearTimeout(directVoiceHintTimerRef.current);
-        directVoiceHintTimerRef.current = null;
-      }
-      directVoiceHintTimerRef.current = setTimeout(() => {
-        setDirectVoiceStoppedHint(false);
-        directVoiceHintTimerRef.current = null;
-      }, 1200);
-      stopDirectVoice();
-      return;
-    }
+    if (directVoiceRecRef.current) return;
 
     // If AI is speaking, interrupt it before listening (call-like feel).
     try {
@@ -1726,10 +1714,23 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               value={text}
               onChange={setText}
               onSend={send}
-              onVoiceInput={() => {
+              onVoicePressStart={() => {
                 startDirectVoice();
               }}
-              onVoiceLongPress={() => {
+              onVoicePressEnd={() => {
+                setDirectVoiceStoppedHint(true);
+                if (directVoiceHintTimerRef.current) {
+                  clearTimeout(directVoiceHintTimerRef.current);
+                  directVoiceHintTimerRef.current = null;
+                }
+                directVoiceHintTimerRef.current = setTimeout(() => {
+                  setDirectVoiceStoppedHint(false);
+                  directVoiceHintTimerRef.current = null;
+                }, 1200);
+                stopDirectVoice();
+              }}
+              onVoiceTapFallback={() => {
+                // Safe fallback: open the existing voice panel.
                 setVoiceOutputUserActivated(true);
                 setVoiceInputOpen(true);
               }}

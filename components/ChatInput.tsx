@@ -6,8 +6,9 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
-  onVoiceInput?: () => void;
-  onVoiceLongPress?: () => void;
+  onVoicePressStart?: () => void;
+  onVoicePressEnd?: () => void;
+  onVoiceTapFallback?: () => void;
   voiceListening?: boolean;
   voiceStatusText?: string | null;
   voiceStatusKind?: "idle" | "listening" | "working" | "speaking";
@@ -19,8 +20,9 @@ export function ChatInput({
   value,
   onChange,
   onSend,
-  onVoiceInput,
-  onVoiceLongPress,
+  onVoicePressStart,
+  onVoicePressEnd,
+  onVoiceTapFallback,
   voiceListening,
   voiceStatusText,
   voiceStatusKind = "idle",
@@ -28,8 +30,7 @@ export function ChatInput({
   placeholder = "Type a message…",
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressTriggeredRef = useRef(false);
+  const pttActiveRef = useRef(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -87,41 +88,52 @@ export function ChatInput({
                 }}
               />
 
-              {onVoiceInput ? (
+              {onVoicePressStart || onVoiceTapFallback ? (
                 <div className="relative shrink-0">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (longPressTriggeredRef.current) {
-                        longPressTriggeredRef.current = false;
-                        return;
+                    onPointerDown={(e) => {
+                      if (!onVoicePressStart) return;
+                      if (disabled) return;
+                      // Push-to-talk: press = start listening.
+                      pttActiveRef.current = true;
+                      try {
+                        (e.currentTarget as HTMLButtonElement).setPointerCapture(
+                          e.pointerId,
+                        );
+                      } catch {
+                        // ignore
                       }
-                      onVoiceInput();
+                      e.preventDefault();
+                      onVoicePressStart();
                     }}
-                    onPointerDown={() => {
-                      if (!onVoiceLongPress) return;
-                      longPressTriggeredRef.current = false;
-                      if (longPressTimerRef.current) {
-                        clearTimeout(longPressTimerRef.current);
-                        longPressTimerRef.current = null;
+                    onPointerUp={(e) => {
+                      if (!onVoicePressEnd) return;
+                      if (!pttActiveRef.current) return;
+                      pttActiveRef.current = false;
+                      try {
+                        (e.currentTarget as HTMLButtonElement).releasePointerCapture(
+                          e.pointerId,
+                        );
+                      } catch {
+                        // ignore
                       }
-                      longPressTimerRef.current = setTimeout(() => {
-                        longPressTriggeredRef.current = true;
-                        onVoiceLongPress();
-                      }, 420);
-                    }}
-                    onPointerUp={() => {
-                      if (!onVoiceLongPress) return;
-                      if (longPressTimerRef.current) {
-                        clearTimeout(longPressTimerRef.current);
-                        longPressTimerRef.current = null;
-                      }
+                      e.preventDefault();
+                      // Release = stop listening (existing flow continues: processing/sending).
+                      onVoicePressEnd();
                     }}
                     onPointerCancel={() => {
-                      if (longPressTimerRef.current) {
-                        clearTimeout(longPressTimerRef.current);
-                        longPressTimerRef.current = null;
-                      }
+                      if (!onVoicePressEnd) return;
+                      if (!pttActiveRef.current) return;
+                      pttActiveRef.current = false;
+                      onVoicePressEnd();
+                    }}
+                    onClick={() => {
+                      // Pointer up triggers click; ignore those.
+                      if (pttActiveRef.current) return;
+                      if (!onVoiceTapFallback) return;
+                      if (disabled) return;
+                      onVoiceTapFallback();
                     }}
                     disabled={disabled}
                     className={[
@@ -136,7 +148,9 @@ export function ChatInput({
                     ].join(" ")}
                     aria-label={voiceListening ? "Stop voice input" : "Voice input"}
                     title={
-                      voiceListening ? "Stop voice input" : "Voice input (hold for panel)"
+                      onVoicePressStart
+                        ? "Hold to talk"
+                        : "Voice input"
                     }
                   >
                     <span className="text-[18px] leading-none">{"\u{1F3A4}"}</span>
