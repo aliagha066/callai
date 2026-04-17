@@ -18,6 +18,12 @@ import { useAuthUI } from "@/components/AuthUIProvider";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { SettingsProvider, useSettings } from "@/components/SettingsProvider";
 import { VoiceInputPanel } from "@/components/VoiceInputPanel";
+import {
+  createSpeechRecognition,
+  type SpeechRecognitionErrorLike,
+  type SpeechRecognitionLike,
+  type SpeechRecognitionResultLike,
+} from "@/components/speechRecognition";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
@@ -196,7 +202,13 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const mobileChatRowMenuIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
-   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
+  const [voiceInputOpen, setVoiceInputOpen] = useState(false);
+  const [directVoiceListening, setDirectVoiceListening] = useState(false);
+  const directVoiceRecRef = useRef<SpeechRecognitionLike | null>(null);
+  const directVoicePreviewRef = useRef("");
+  const sendRef = useRef<(overrideContent?: string) => void | Promise<void>>(
+    () => {},
+  );
   const [autoPlayVoice, setAutoPlayVoice] = useState(false);
   const [ttsSpeakingMessageId, setTtsSpeakingMessageId] = useState<string | null>(
     null,
@@ -236,6 +248,84 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     return last;
   }, [messages]);
 
+  const stopDirectVoice = useCallback(() => {
+    const rec = directVoiceRecRef.current;
+    if (!rec) return;
+    try {
+      rec.stop();
+    } catch {
+      try {
+        rec.abort();
+      } catch {
+        // ignore
+      }
+    }
+    directVoiceRecRef.current = null;
+    setDirectVoiceListening(false);
+  }, []);
+
+  const startDirectVoice = useCallback(() => {
+    setVoiceOutputUserActivated(true);
+
+    if (directVoiceRecRef.current) {
+      stopDirectVoice();
+      return;
+    }
+
+    const rec = createSpeechRecognition({
+      continuous: false,
+      interimResults: true,
+    });
+    if (!rec) {
+      setVoiceInputOpen(true);
+      return;
+    }
+
+    directVoicePreviewRef.current = "";
+
+    rec.onresult = (event: SpeechRecognitionResultLike) => {
+      let transcript = "";
+      const results = event.results;
+      for (let i = 0; i < results.length; i++) {
+        transcript += results[i]?.[0]?.transcript ?? "";
+      }
+      directVoicePreviewRef.current = transcript.trim();
+    };
+
+    rec.onerror = (event: SpeechRecognitionErrorLike) => {
+      if (event.error === "aborted") return;
+      if (event.error === "no-speech") return;
+      stopDirectVoice();
+      setVoiceInputOpen(true);
+    };
+
+    rec.onstart = () => {
+      setDirectVoiceListening(true);
+    };
+
+    rec.onend = () => {
+      setDirectVoiceListening(false);
+      directVoiceRecRef.current = null;
+      const latest = directVoicePreviewRef.current.trim();
+      if (!latest) return;
+      void sendRef.current(latest);
+    };
+
+    directVoiceRecRef.current = rec;
+    try {
+      rec.start();
+    } catch {
+      stopDirectVoice();
+      setVoiceInputOpen(true);
+    }
+  }, [stopDirectVoice]);
+
+  useEffect(() => {
+    return () => {
+      stopDirectVoice();
+    };
+  }, [stopDirectVoice]);
+
   useEffect(() => {
     try {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -245,7 +335,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       // ignore
     }
     setTtsSpeakingMessageId(null);
-  }, [activeChatId]);
+    stopDirectVoice();
+  }, [activeChatId, stopDirectVoice]);
 
   const handleTtsStart = useCallback((id: string) => {
     setTtsSpeakingMessageId(id);
@@ -683,7 +774,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     }
   }, [activeChatId, user, interactedByChat, loginBannerSeenByChat, userMessageCount]);
 
-  function updateActiveChat(updater: (chat: ChatSession) => ChatSession) {
+  const updateActiveChat = useCallback((updater: (chat: ChatSession) => ChatSession) => {
     setChats((prev) => {
       const idx = prev.findIndex((c) => c.id === activeChatId);
       if (idx === -1) return prev;
@@ -691,7 +782,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       next[idx] = updater(next[idx]);
       return next;
     });
-  }
+  }, [activeChatId]);
 
   function createNewChat(opts?: { openMobileDrawer?: boolean }) {
     const now = new Date().toISOString();
@@ -853,8 +944,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     );
   }
 
-  async function send() {
-    const content = text.trim();
+  const send = useCallback(async (overrideContent?: string) => {
+    const content = (overrideContent ?? text).trim();
     if (!content || isLoading) return;
 
     setInteractedByChat((prev) => ({ ...prev, [activeChatId]: 1 }));
@@ -908,7 +999,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         };
       });
     }
-    setText("");
+    if (overrideContent === undefined) setText("");
 
     try {
       if (shouldAutoTitleThisChat) {
@@ -985,7 +1076,25 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [
+    activeChatId,
+    aiName,
+    chats,
+    companionMode,
+    displayName,
+    isAuthed,
+    isLoading,
+    messages,
+    preferredLanguage,
+    responseStyle,
+    text,
+    updateActiveChat,
+    user,
+  ]);
+
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
 
   function renderSidebarChatRows(forMobile: boolean) {
     return (
@@ -1510,9 +1619,13 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               onChange={setText}
               onSend={send}
               onVoiceInput={() => {
+                startDirectVoice();
+              }}
+              onVoiceLongPress={() => {
                 setVoiceOutputUserActivated(true);
                 setVoiceInputOpen(true);
               }}
+              voiceListening={directVoiceListening}
               disabled={isLoading}
               placeholder={isLoading ? `${aiName} is writing…` : undefined}
             />

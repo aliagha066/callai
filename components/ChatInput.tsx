@@ -7,6 +7,8 @@ type Props = {
   onChange: (value: string) => void;
   onSend: () => void;
   onVoiceInput?: () => void;
+  onVoiceLongPress?: () => void;
+  voiceListening?: boolean;
   disabled?: boolean;
   placeholder?: string;
 };
@@ -16,10 +18,14 @@ export function ChatInput({
   onChange,
   onSend,
   onVoiceInput,
+  onVoiceLongPress,
+  voiceListening,
   disabled,
   placeholder = "Type a message…",
 }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -67,16 +73,61 @@ export function ChatInput({
             />
 
             {onVoiceInput ? (
-              <button
-                type="button"
-                onClick={onVoiceInput}
-                disabled={disabled}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-white/80 ring-1 ring-white/10 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/10 hover:text-white/90 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Voice input"
-                title="Voice input"
-              >
-                <span className="text-[18px] leading-none">{"\u{1F3A4}"}</span>
-              </button>
+              <div className="relative shrink-0">
+                {voiceListening ? (
+                  <span className="pointer-events-none absolute -top-5 right-0 select-none text-[11px] font-medium text-indigo-200/85">
+                    Listening…
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (longPressTriggeredRef.current) {
+                      longPressTriggeredRef.current = false;
+                      return;
+                    }
+                    onVoiceInput();
+                  }}
+                  onPointerDown={() => {
+                    if (!onVoiceLongPress) return;
+                    longPressTriggeredRef.current = false;
+                    if (longPressTimerRef.current) {
+                      clearTimeout(longPressTimerRef.current);
+                      longPressTimerRef.current = null;
+                    }
+                    longPressTimerRef.current = setTimeout(() => {
+                      longPressTriggeredRef.current = true;
+                      onVoiceLongPress();
+                    }, 420);
+                  }}
+                  onPointerUp={() => {
+                    if (!onVoiceLongPress) return;
+                    if (longPressTimerRef.current) {
+                      clearTimeout(longPressTimerRef.current);
+                      longPressTimerRef.current = null;
+                    }
+                  }}
+                  onPointerCancel={() => {
+                    if (longPressTimerRef.current) {
+                      clearTimeout(longPressTimerRef.current);
+                      longPressTimerRef.current = null;
+                    }
+                  }}
+                  disabled={disabled}
+                  className={[
+                    "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-sm font-semibold ring-1 ring-white/10 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50",
+                    voiceListening
+                      ? "bg-indigo-500/20 text-white ring-indigo-400/30 hover:bg-indigo-500/24"
+                      : "bg-white/5 text-white/80 hover:bg-white/10 hover:text-white/90",
+                  ].join(" ")}
+                  aria-label={voiceListening ? "Stop voice input" : "Voice input"}
+                  title={
+                    voiceListening ? "Stop voice input" : "Voice input (hold for panel)"
+                  }
+                >
+                  <span className="text-[18px] leading-none">{"\u{1F3A4}"}</span>
+                </button>
+              </div>
             ) : null}
 
             <button

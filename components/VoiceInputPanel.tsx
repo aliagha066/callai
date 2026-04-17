@@ -1,47 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createSpeechRecognition,
+  getSpeechRecognitionCtor,
+  type SpeechRecognitionErrorLike,
+  type SpeechRecognitionLike,
+  type SpeechRecognitionResultLike,
+} from "./speechRecognition";
 
 type Props = {
   onClose: () => void;
   onUseText: (text: string) => void;
   onSend?: () => void;
 };
-
-/** Minimal typings — not all TS lib targets include Web Speech API. */
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((ev: SpeechRecognitionResultLike) => void) | null;
-  onerror: ((ev: SpeechRecognitionErrorLike) => void) | null;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-};
-
-type SpeechRecognitionResultLike = {
-  results: {
-    length: number;
-    [index: number]: { 0: { transcript: string }; isFinal?: boolean };
-  };
-};
-
-type SpeechRecognitionErrorLike = {
-  error: string;
-};
-
-function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
-  if (typeof window === "undefined") return null;
-  const w = window as Window &
-    typeof globalThis & {
-      SpeechRecognition?: new () => SpeechRecognitionLike;
-      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-    };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
 
 export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
   const recRef = useRef<SpeechRecognitionLike | null>(null);
@@ -125,25 +97,12 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
       stoppedTimerRef.current = null;
     }
     setErrorMessage(null);
-    const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) return;
-
     stopRecognition();
-
-    let rec: SpeechRecognitionLike;
-    try {
-      rec = new Ctor();
-    } catch {
-      return;
-    }
-
-    rec.continuous = true;
-    rec.interimResults = true;
-    try {
-      rec.lang = navigator.language || "en-US";
-    } catch {
-      rec.lang = "en-US";
-    }
+    const rec = createSpeechRecognition({
+      continuous: true,
+      interimResults: true,
+    });
+    if (!rec) return;
 
     rec.onresult = (event: SpeechRecognitionResultLike) => {
       let transcript = "";
