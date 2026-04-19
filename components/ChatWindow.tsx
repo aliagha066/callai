@@ -53,6 +53,10 @@ type ChatSession = {
 const STORAGE_CHATS_KEY = "callai.chat.sessions.v1";
 const STORAGE_ACTIVE_KEY = "callai.chat.activeId.v1";
 const TYPING_ID = "typing";
+
+function countMessagesExcludingTyping(msgs: ChatMessage[]) {
+  return msgs.filter((m) => m.id !== TYPING_ID).length;
+}
 const LOGIN_BANNER_SEEN_BY_CHAT_KEY = "callai.ui.loginBannerSeenByChat.v1";
 const SUPA_ACTIVE_KEY_PREFIX = "callai.sb.activeId.v1.";
 const AI_NAME_CACHE_KEY = "callai.settings.ai_name.v1";
@@ -213,6 +217,9 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const prevScrollChatIdRef = useRef<string | null>(null);
   const [jumpToLatestVisible, setJumpToLatestVisible] = useState(false);
   const [composerPinnedOpen, setComposerPinnedOpen] = useState(false);
+  const [pendingNewWhileAway, setPendingNewWhileAway] = useState(0);
+  const latestNonTypingCountRef = useRef(0);
+  const baselineNonTypingCountRef = useRef(0);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
   const [directVoiceListening, setDirectVoiceListening] = useState(false);
@@ -312,6 +319,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
   const messages = useMemo(() => activeChat?.messages ?? [], [activeChat]);
 
+  const nonTypingMsgCount = useMemo(
+    () => countMessagesExcludingTyping(messages),
+    [messages],
+  );
+  latestNonTypingCountRef.current = nonTypingMsgCount;
+
   const lastAssistantMessageId = useMemo(() => {
     let last: string | null = null;
     for (const m of messages) {
@@ -333,6 +346,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     nearBottomRef.current = near;
     if (near) {
       setComposerPinnedOpen(false);
+      baselineNonTypingCountRef.current = latestNonTypingCountRef.current;
+      setPendingNewWhileAway(0);
     }
     const scrollable = total > viewH + 48;
     setJumpToLatestVisible(scrollable && !near);
@@ -347,12 +362,24 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
   const scrollToLatestMessages = useCallback(() => {
     setComposerPinnedOpen(false);
+    setPendingNewWhileAway(0);
+    baselineNonTypingCountRef.current = latestNonTypingCountRef.current;
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     window.setTimeout(() => {
       nearBottomRef.current = true;
       updateScrollState();
     }, 400);
   }, [updateScrollState]);
+
+  useEffect(() => {
+    updateScrollState();
+    if (nearBottomRef.current) return;
+    const current = latestNonTypingCountRef.current;
+    const base = baselineNonTypingCountRef.current;
+    if (current > base) {
+      setPendingNewWhileAway(current - base);
+    }
+  }, [activeChat?.updatedAt, nonTypingMsgCount, updateScrollState]);
 
   useEffect(() => {
     updateScrollState();
@@ -384,6 +411,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     if (switched) {
       nearBottomRef.current = true;
       setComposerPinnedOpen(false);
+      setPendingNewWhileAway(0);
       requestAnimationFrame(() => {
         endRef.current?.scrollIntoView({ block: "end" });
         updateScrollState();
@@ -2032,19 +2060,48 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             </div>
           </main>
 
-          {jumpToLatestVisible ? (
-            <button
-              type="button"
-              onClick={scrollToLatestMessages}
-              className="pointer-events-auto fixed z-[52] inline-flex h-9 max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-full border border-white/10 bg-black/55 px-3 text-[11px] font-semibold text-white/80 shadow-[0_8px_28px_rgba(0,0,0,0.55)] backdrop-blur-md transition-colors duration-200 hover:border-white/15 hover:bg-black/65 hover:text-white/90 sm:h-9 sm:px-3.5 sm:text-xs bottom-[calc(env(safe-area-inset-bottom)+13.5rem)] right-3 sm:bottom-32 sm:right-8"
-              title="Latest messages"
-              aria-label="Scroll to latest messages"
+          {jumpToLatestVisible || pendingNewWhileAway > 0 ? (
+            <div
+              className="pointer-events-none fixed z-[52] flex max-w-[calc(100vw-1.5rem)] flex-row-reverse items-center gap-2 bottom-[calc(env(safe-area-inset-bottom)+13.5rem)] right-3 sm:bottom-32 sm:right-8"
+              aria-live="polite"
             >
-              <span className="text-sm leading-none" aria-hidden>
-                ↓
-              </span>
-              <span className="truncate">Latest</span>
-            </button>
+              {jumpToLatestVisible ? (
+                <button
+                  type="button"
+                  onClick={scrollToLatestMessages}
+                  className="pointer-events-auto inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-black/55 px-3 text-[11px] font-semibold text-white/80 shadow-[0_8px_28px_rgba(0,0,0,0.55)] backdrop-blur-md transition-colors duration-200 hover:border-white/15 hover:bg-black/65 hover:text-white/90 sm:h-9 sm:px-3.5 sm:text-xs"
+                  title="Latest messages"
+                  aria-label="Scroll to latest messages"
+                >
+                  <span className="text-sm leading-none" aria-hidden>
+                    ↓
+                  </span>
+                  <span className="truncate">Latest</span>
+                </button>
+              ) : null}
+              {pendingNewWhileAway > 0 ? (
+                <button
+                  type="button"
+                  onClick={scrollToLatestMessages}
+                  className="pointer-events-auto inline-flex h-9 max-w-[min(11rem,calc(100vw-5rem))] shrink items-center gap-1 rounded-full border border-indigo-400/25 bg-indigo-500/15 px-2.5 text-[11px] font-semibold text-indigo-100/90 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors duration-200 hover:border-indigo-400/35 hover:bg-indigo-500/22 sm:px-3 sm:text-xs"
+                  title="New messages — jump to bottom"
+                  aria-label={
+                    pendingNewWhileAway === 1
+                      ? "1 new message, jump to bottom"
+                      : `${pendingNewWhileAway} new messages, jump to bottom`
+                  }
+                >
+                  <span className="text-xs leading-none opacity-90" aria-hidden>
+                    ↓
+                  </span>
+                  <span className="truncate">
+                    {pendingNewWhileAway === 1
+                      ? "1 new"
+                      : `${pendingNewWhileAway} new`}
+                  </span>
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {composerRecessed ? (
