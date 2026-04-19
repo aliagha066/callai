@@ -60,7 +60,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/5 bg-black/35 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+    <div className="w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/10 bg-gradient-to-t from-black/70 via-black/45 to-black/15 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl backdrop-saturate-150">
       <div className="w-full max-w-full overflow-x-hidden px-3">
         <div className="mx-auto w-full max-w-4xl py-4 sm:px-1 sm:py-4">
           <form

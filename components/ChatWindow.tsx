@@ -208,6 +208,10 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   );
   const mobileChatRowMenuIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const nearBottomRef = useRef(true);
+  const scrollMeasureRafRef = useRef<number | null>(null);
+  const prevScrollChatIdRef = useRef<string | null>(null);
+  const [jumpToLatestVisible, setJumpToLatestVisible] = useState(false);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
   const [directVoiceListening, setDirectVoiceListening] = useState(false);
@@ -314,6 +318,76 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     }
     return last;
   }, [messages]);
+
+  const BOTTOM_SCROLL_THRESHOLD_PX = 168;
+
+  const updateScrollState = useCallback(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const root = document.documentElement;
+    const scrollTop = window.scrollY;
+    const viewH = window.innerHeight;
+    const total = root.scrollHeight;
+    const distFromBottom = total - scrollTop - viewH;
+    const near = distFromBottom <= BOTTOM_SCROLL_THRESHOLD_PX;
+    nearBottomRef.current = near;
+    const scrollable = total > viewH + 48;
+    setJumpToLatestVisible(scrollable && !near);
+  }, []);
+
+  const scrollToLatestMessages = useCallback(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    window.setTimeout(() => {
+      nearBottomRef.current = true;
+      updateScrollState();
+    }, 400);
+  }, [updateScrollState]);
+
+  useEffect(() => {
+    updateScrollState();
+    function onScroll() {
+      if (scrollMeasureRafRef.current != null) return;
+      scrollMeasureRafRef.current = window.requestAnimationFrame(() => {
+        scrollMeasureRafRef.current = null;
+        updateScrollState();
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", updateScrollState);
+      if (scrollMeasureRafRef.current != null) {
+        cancelAnimationFrame(scrollMeasureRafRef.current);
+        scrollMeasureRafRef.current = null;
+      }
+    };
+  }, [updateScrollState]);
+
+  useEffect(() => {
+    const switched =
+      prevScrollChatIdRef.current !== null &&
+      prevScrollChatIdRef.current !== activeChatId;
+    prevScrollChatIdRef.current = activeChatId;
+
+    if (switched) {
+      nearBottomRef.current = true;
+      requestAnimationFrame(() => {
+        endRef.current?.scrollIntoView({ block: "end" });
+        updateScrollState();
+      });
+      return;
+    }
+
+    if (nearBottomRef.current) {
+      requestAnimationFrame(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    }
+
+    requestAnimationFrame(() => {
+      updateScrollState();
+    });
+  }, [activeChatId, activeChat?.updatedAt, isLoading, updateScrollState]);
 
   const stopDirectVoice = useCallback(() => {
     if (directVoiceSettleHintTimerRef.current) {
@@ -636,10 +710,6 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     const normal = base.filter((c) => !c.pinned);
     return [...pinned, ...normal];
   }, [chats, chatSearch]);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
 
   useEffect(() => {
     if (!mobileChatDrawerOpen) {
@@ -1889,7 +1959,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             </div>
           </header>
 
-          <main className="mx-auto w-full min-w-0 max-w-full sm:max-w-4xl flex-1 overflow-x-hidden px-3 pb-28 sm:px-4 sm:pb-0">
+          <main className="relative mx-auto w-full min-w-0 max-w-full sm:max-w-4xl flex-1 overflow-x-hidden px-3 pb-32 sm:px-4 sm:pb-6">
             <div className="py-7 sm:py-8">
               <div className="space-y-4 sm:space-y-5">
                 {messages.map((m) => (
@@ -1946,6 +2016,21 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
               </div>
             </div>
           </main>
+
+          {jumpToLatestVisible ? (
+            <button
+              type="button"
+              onClick={scrollToLatestMessages}
+              className="pointer-events-auto fixed z-[48] inline-flex h-9 max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-full border border-white/10 bg-black/55 px-3 text-[11px] font-semibold text-white/80 shadow-[0_8px_28px_rgba(0,0,0,0.55)] backdrop-blur-md transition-colors duration-200 hover:border-white/15 hover:bg-black/65 hover:text-white/90 sm:h-9 sm:px-3.5 sm:text-xs bottom-[calc(env(safe-area-inset-bottom)+13.5rem)] right-3 sm:bottom-32 sm:right-8"
+              title="Latest messages"
+              aria-label="Scroll to latest messages"
+            >
+              <span className="text-sm leading-none" aria-hidden>
+                ↓
+              </span>
+              <span className="truncate">Latest</span>
+            </button>
+          ) : null}
 
           <div className="fixed inset-x-0 bottom-0 z-50 w-full min-w-0 max-w-full overflow-x-hidden sm:sticky sm:inset-x-auto sm:z-auto">
             <ChatInput
