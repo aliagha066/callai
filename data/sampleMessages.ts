@@ -12,7 +12,7 @@ export const sampleMessages: ChatMessage[] = [
     id: "m1",
     role: "assistant",
     content:
-      "Hi — I’m here for calm conversation. Type below, use the mic in the bar to dictate, or open Voice for a guided panel. Adjust tone and voice in Settings.",
+      "Hi — I’m CallAI, a calm companion for everyday conversation. Say what’s on your mind, or ask a question. You can type below, use the mic, or open Voice in the header. Tone and voice live in Settings.",
   },
   {
     id: "m2",

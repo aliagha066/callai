@@ -57,6 +57,20 @@ const TYPING_ID = "typing";
 function countMessagesExcludingTyping(msgs: ChatMessage[]) {
   return msgs.filter((m) => m.id !== TYPING_ID).length;
 }
+
+function friendlySendError(message: string): string {
+  const t = message.trim();
+  const lower = t.toLowerCase();
+  if (!t) return "Something went wrong. Please try again.";
+  if (lower.includes("failed to fetch") || lower.includes("networkerror")) {
+    return "Check your connection, then try again.";
+  }
+  if (lower.includes("aborted")) {
+    return "The request was interrupted. Please try again.";
+  }
+  if (t.length > 180) return "Something went wrong. Please try again.";
+  return t;
+}
 const LOGIN_BANNER_SEEN_BY_CHAT_KEY = "callai.ui.loginBannerSeenByChat.v1";
 const SUPA_ACTIVE_KEY_PREFIX = "callai.sb.activeId.v1.";
 const AI_NAME_CACHE_KEY = "callai.settings.ai_name.v1";
@@ -246,6 +260,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const sendRef = useRef<(overrideContent?: string) => void | Promise<void>>(
     () => {},
   );
+  const sendInFlightRef = useRef(false);
   const [ttsSpeakingMessageId, setTtsSpeakingMessageId] = useState<string | null>(
     null,
   );
@@ -318,6 +333,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   );
 
   const messages = useMemo(() => activeChat?.messages ?? [], [activeChat]);
+
+  const showStartChatHint = useMemo(() => {
+    if (isLoading) return false;
+    if (!messages.length) return false;
+    return !messages.some((m) => m.role === "user");
+  }, [messages, isLoading]);
 
   const nonTypingMsgCount = useMemo(
     () => countMessagesExcludingTyping(messages),
@@ -1235,7 +1256,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         if (openDrawer) setMobileChatDrawerOpen(true);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create chat";
-        setError(msg);
+        setError(friendlySendError(msg));
       }
     })();
   }
@@ -1338,8 +1359,10 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const send = useCallback(async (overrideContent?: string) => {
     const content = (overrideContent ?? text).trim();
     if (!content || isLoading) return;
-
-    // Lightweight long-term memory: extract a few safe facts from REAL user text.
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
+    try {
+      // Lightweight long-term memory: extract a few safe facts from REAL user text.
     // Stored locally per-user (or guest) and optionally sent as extra context.
     let mergedFactsForThisTurn = memoryFacts;
     try {
@@ -1437,12 +1460,22 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         }),
       });
 
-      const data = (await res.json()) as { reply?: string; error?: string };
+      const rawBody = await res.text();
+      let data: { reply?: string; error?: string } = {};
+      try {
+        data = JSON.parse(rawBody) as { reply?: string; error?: string };
+      } catch {
+        // Non-JSON body (e.g. proxy error page) — treat as failure below.
+      }
       if (!res.ok) {
-        throw new Error(data?.error || "Request failed");
+        throw new Error(
+          typeof data.error === "string" && data.error.trim()
+            ? data.error.trim()
+            : `Couldn’t send (error ${res.status})`,
+        );
       }
       if (!data.reply) {
-        throw new Error("No reply received");
+        throw new Error("No reply received. Please try again.");
       }
 
       const assistantMsg: ChatMessage = {
@@ -1472,14 +1505,16 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Something went wrong";
-      setError(msg);
+      setError(friendlySendError(msg));
       updateActiveChat((c) => ({
         ...c,
         messages: c.messages.filter((m) => m.id !== TYPING_ID),
         updatedAt: new Date().toISOString(),
       }));
+    }
     } finally {
       setIsLoading(false);
+      sendInFlightRef.current = false;
     }
   }, [
     activeChatId,
@@ -2005,6 +2040,13 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
           <main className="relative mx-auto w-full min-w-0 max-w-full sm:max-w-4xl flex-1 overflow-x-hidden px-3 pb-32 sm:px-4 sm:pb-6">
             <div className="py-7 sm:py-8">
               <div className="space-y-4 sm:space-y-5">
+                {showStartChatHint ? (
+                  <p className="mx-auto max-w-2xl px-1 text-center text-[11px] leading-relaxed text-white/42">
+                    Start here: type a message in the box below, then tap send or
+                    press Enter. Use the mic to dictate, or Voice in the header for
+                    more options.
+                  </p>
+                ) : null}
                 {messages.map((m) => (
                   <MessageBubble
                     key={m.id}
@@ -2051,7 +2093,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                 {error ? (
                   <div className="flex justify-center">
                     <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/65">
-                      Couldn’t reach SOFIA. {error}
+                      We couldn’t get a reply. {error}
                     </div>
                   </div>
                 ) : null}
