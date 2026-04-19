@@ -63,15 +63,15 @@ export function ChatInput({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/10 bg-gradient-to-t from-black/70 via-black/45 to-black/15 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_48px_rgba(0,0,0,0.42)] backdrop-blur-xl backdrop-saturate-150">
-      <div className="w-full max-w-full overflow-x-hidden px-3">
-        <div className="mx-auto w-full max-w-4xl py-4 sm:px-1 sm:py-4">
+    <div className="w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/10 bg-gradient-to-t from-black/60 via-black/38 to-black/10 pb-[max(0.35rem,env(safe-area-inset-bottom))] shadow-[0_-10px_32px_rgba(0,0,0,0.32)] backdrop-blur-xl backdrop-saturate-150 sm:from-black/70 sm:via-black/45 sm:to-black/15 sm:pb-[env(safe-area-inset-bottom)] sm:shadow-[0_-18px_48px_rgba(0,0,0,0.42)]">
+      <div className="w-full max-w-full overflow-x-hidden px-2.5 sm:px-3">
+        <div className="mx-auto w-full max-w-4xl py-2.5 sm:px-1 sm:py-4">
           <form
-            className="flex w-full max-w-full min-w-0 flex-col gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200"
+            className="flex w-full max-w-full min-w-0 flex-col gap-1.5 overflow-x-hidden rounded-[1.125rem] border border-white/10 bg-[rgb(var(--panel))] p-1.5 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_16px_rgba(99,102,241,0.05)] ring-1 ring-black/20 transition-all duration-200 sm:gap-2 sm:rounded-2xl sm:p-2 sm:shadow-[0_0_20px_rgba(99,102,241,0.06)] sm:ring-0"
             onSubmit={handleSubmit}
             onFocusCapture={() => onComposerInteract?.()}
           >
-            <div className="flex w-full min-w-0 items-center gap-2">
+            <div className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2">
               <textarea
                 id="callai-composer-textarea"
                 ref={textareaRef}
@@ -80,7 +80,7 @@ export function ChatInput({
                 disabled={disabled}
                 placeholder={placeholder}
                 rows={1}
-                className="max-h-40 min-h-[44px] w-full max-w-full min-w-0 flex-1 resize-none rounded-xl bg-black/20 px-3 py-2 text-[16px] leading-relaxed text-white placeholder:text-white/35 ring-1 ring-white/10 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 sm:text-sm"
+                className="max-h-40 min-h-[44px] w-full max-w-full min-w-0 flex-1 resize-none rounded-xl bg-black/20 px-2.5 py-1.5 text-[16px] leading-relaxed text-white placeholder:text-white/35 ring-1 ring-white/10 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 sm:px-3 sm:py-2 sm:text-sm"
                 onFocus={handleFocus}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -108,7 +108,7 @@ export function ChatInput({
                     }}
                     disabled={disabled}
                     className={[
-                      "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 text-sm font-semibold ring-1 ring-white/10 shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50",
+                      "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 text-sm font-semibold ring-1 ring-white/10 shadow-[0_0_14px_rgba(99,102,241,0.05)] transition-all duration-200 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11 sm:shadow-[0_0_20px_rgba(99,102,241,0.06)]",
                       voiceStatusKind === "listening"
                         ? "bg-indigo-500/22 text-white ring-indigo-400/40 hover:bg-indigo-500/26"
                         : voiceStatusKind === "working"
@@ -134,7 +134,7 @@ export function ChatInput({
               <button
                 type="submit"
                 disabled={disabled || value.trim().length === 0}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sm font-semibold text-white ring-1 ring-white/10 shadow-[0_0_20px_rgba(99,102,241,0.08)] transition-all duration-200 hover:bg-white/14 hover:ring-white/20 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sm font-semibold text-white ring-1 ring-white/10 shadow-[0_0_14px_rgba(99,102,241,0.06)] transition-all duration-200 hover:bg-white/14 hover:ring-white/20 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11 sm:shadow-[0_0_20px_rgba(99,102,241,0.08)]"
                 aria-label="Send message"
                 title="Send"
               >
@@ -144,7 +144,7 @@ export function ChatInput({
 
             <div
               className={[
-                "min-h-[1.125rem] px-1 text-[11px] font-medium leading-tight tabular-nums transition-opacity duration-200",
+                "min-h-[1rem] px-0.5 text-[10px] font-medium leading-tight tabular-nums transition-opacity duration-200 sm:min-h-[1.125rem] sm:px-1 sm:text-[11px]",
                 voiceStatusText ? "opacity-100 text-indigo-200/90" : "opacity-0",
               ].join(" ")}
               aria-live={voiceStatusText ? "polite" : "off"}
@@ -155,13 +155,12 @@ export function ChatInput({
           </form>
         </div>
 
-        <div className="mx-auto w-full max-w-4xl mt-2 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <p className="min-w-0 text-xs text-white/40">
+        <div className="mx-auto mt-1.5 hidden w-full max-w-4xl min-w-0 flex-col gap-1 text-xs sm:mt-2 sm:flex sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <p className="min-w-0 text-white/40">
             Type or dictate, then send. Logged in: chats sync to your account. Guest:
             chats stay on this device. Voice works best in Chrome or Edge over HTTPS.
           </p>
-          <p className="text-xs text-white/35 sm:text-right">
-            <span className="sm:hidden">Enter sends · Shift+Enter newline</span>
+          <p className="text-white/35 sm:text-right">
             <span className="hidden sm:inline">Enter to send · Shift+Enter for new line</span>
           </p>
         </div>
