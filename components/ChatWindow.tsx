@@ -212,6 +212,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const scrollMeasureRafRef = useRef<number | null>(null);
   const prevScrollChatIdRef = useRef<string | null>(null);
   const [jumpToLatestVisible, setJumpToLatestVisible] = useState(false);
+  const [composerPinnedOpen, setComposerPinnedOpen] = useState(false);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
   const [directVoiceListening, setDirectVoiceListening] = useState(false);
@@ -319,7 +320,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     return last;
   }, [messages]);
 
-  const BOTTOM_SCROLL_THRESHOLD_PX = 168;
+  const BOTTOM_SCROLL_THRESHOLD_PX = 120;
 
   const updateScrollState = useCallback(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
@@ -330,11 +331,22 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     const distFromBottom = total - scrollTop - viewH;
     const near = distFromBottom <= BOTTOM_SCROLL_THRESHOLD_PX;
     nearBottomRef.current = near;
+    if (near) {
+      setComposerPinnedOpen(false);
+    }
     const scrollable = total > viewH + 48;
     setJumpToLatestVisible(scrollable && !near);
   }, []);
 
+  const revealComposer = useCallback(() => {
+    setComposerPinnedOpen(true);
+    requestAnimationFrame(() => {
+      document.getElementById("callai-composer-textarea")?.focus();
+    });
+  }, []);
+
   const scrollToLatestMessages = useCallback(() => {
+    setComposerPinnedOpen(false);
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     window.setTimeout(() => {
       nearBottomRef.current = true;
@@ -371,6 +383,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
     if (switched) {
       nearBottomRef.current = true;
+      setComposerPinnedOpen(false);
       requestAnimationFrame(() => {
         endRef.current?.scrollIntoView({ block: "end" });
         updateScrollState();
@@ -1730,6 +1743,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     );
   }
 
+  const composerRecessed = jumpToLatestVisible && !composerPinnedOpen;
+
   return (
     <div className="flex min-h-[100dvh] w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
       <div className="pointer-events-none fixed inset-0 -z-10">
@@ -2021,7 +2036,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             <button
               type="button"
               onClick={scrollToLatestMessages}
-              className="pointer-events-auto fixed z-[48] inline-flex h-9 max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-full border border-white/10 bg-black/55 px-3 text-[11px] font-semibold text-white/80 shadow-[0_8px_28px_rgba(0,0,0,0.55)] backdrop-blur-md transition-colors duration-200 hover:border-white/15 hover:bg-black/65 hover:text-white/90 sm:h-9 sm:px-3.5 sm:text-xs bottom-[calc(env(safe-area-inset-bottom)+13.5rem)] right-3 sm:bottom-32 sm:right-8"
+              className="pointer-events-auto fixed z-[52] inline-flex h-9 max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-full border border-white/10 bg-black/55 px-3 text-[11px] font-semibold text-white/80 shadow-[0_8px_28px_rgba(0,0,0,0.55)] backdrop-blur-md transition-colors duration-200 hover:border-white/15 hover:bg-black/65 hover:text-white/90 sm:h-9 sm:px-3.5 sm:text-xs bottom-[calc(env(safe-area-inset-bottom)+13.5rem)] right-3 sm:bottom-32 sm:right-8"
               title="Latest messages"
               aria-label="Scroll to latest messages"
             >
@@ -2032,11 +2047,34 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             </button>
           ) : null}
 
-          <div className="fixed inset-x-0 bottom-0 z-50 w-full min-w-0 max-w-full overflow-x-hidden sm:sticky sm:inset-x-auto sm:z-auto">
+          {composerRecessed ? (
+            <button
+              type="button"
+              onClick={revealComposer}
+              className="motion-reduce:hidden pointer-events-auto fixed inset-x-0 bottom-0 z-[51] flex h-11 min-h-[44px] items-center justify-center gap-2 border-t border-white/10 bg-black/65 pb-[env(safe-area-inset-bottom)] text-xs font-semibold text-white/70 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors duration-200 hover:bg-black/75 hover:text-white/85"
+              title="Show message composer"
+              aria-label="Show message composer"
+            >
+              <span className="text-sm leading-none text-white/55" aria-hidden>
+                ↑
+              </span>
+              <span>Message</span>
+            </button>
+          ) : null}
+
+          <div
+            className={[
+              "fixed inset-x-0 bottom-0 z-50 w-full min-w-0 max-w-full overflow-x-hidden transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none sm:sticky sm:inset-x-auto sm:z-auto",
+              composerRecessed
+                ? "pointer-events-none translate-y-full opacity-0 motion-reduce:pointer-events-auto motion-reduce:translate-y-0 motion-reduce:opacity-100"
+                : "pointer-events-auto translate-y-0 opacity-100",
+            ].join(" ")}
+          >
             <ChatInput
               value={text}
               onChange={setText}
               onSend={send}
+              onComposerInteract={() => setComposerPinnedOpen(true)}
               onVoiceMicToggle={toggleDirectVoice}
               onVoiceOpenPanelFallback={() => {
                 // Secondary path only (right click / long-press context menu).

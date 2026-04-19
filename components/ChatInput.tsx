@@ -6,6 +6,8 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  /** Called when the user focuses the composer (keeps it visible when auto-recessed). */
+  onComposerInteract?: () => void;
   onVoiceMicToggle?: () => void;
   onVoiceOpenPanelFallback?: () => void;
   voiceListening?: boolean;
@@ -19,6 +21,7 @@ export function ChatInput({
   value,
   onChange,
   onSend,
+  onComposerInteract,
   onVoiceMicToggle,
   onVoiceOpenPanelFallback,
   voiceListening,
@@ -66,9 +69,11 @@ export function ChatInput({
           <form
             className="flex w-full max-w-full min-w-0 flex-col gap-2 overflow-x-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-2 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] shadow-[0_0_20px_rgba(99,102,241,0.06)] transition-all duration-200"
             onSubmit={handleSubmit}
+            onFocusCapture={() => onComposerInteract?.()}
           >
             <div className="flex w-full min-w-0 items-center gap-2">
               <textarea
+                id="callai-composer-textarea"
                 ref={textareaRef}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
@@ -89,6 +94,7 @@ export function ChatInput({
                 <div className="relative shrink-0">
                   <button
                     type="button"
+                    onPointerDown={() => onComposerInteract?.()}
                     onClick={() => {
                       if (!onVoiceMicToggle) return;
                       if (disabled) return;
