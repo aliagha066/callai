@@ -36,6 +36,32 @@ body {
   background: rgba(var(--accent), 0.22);
 }
 
+@keyframes callai-wave-bar {
+  0%,
+  100% {
+    transform: scaleY(0.32);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 0.9;
+  }
+}
+
+.callai-wave-bar {
+  height: 1.35rem;
+  transform-origin: center bottom;
+  animation: callai-wave-bar 0.85s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .callai-wave-bar {
+    animation: none;
+    transform: scaleY(0.55);
+    opacity: 0.55;
+  }
+}
+
 /* Subtle premium focus ring */
 :focus-visible {
   outline: 2px solid rgba(var(--ring), 0.45);

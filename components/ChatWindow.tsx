@@ -18,6 +18,7 @@ import { useAuthUI } from "@/components/AuthUIProvider";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { SettingsProvider, useSettings } from "@/components/SettingsProvider";
 import { VoiceInputPanel } from "@/components/VoiceInputPanel";
+import { CallModeOverlay } from "@/components/CallModeOverlay";
 import {
   createSpeechRecognition,
   type SpeechRecognitionErrorLike,
@@ -235,6 +236,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const latestNonTypingCountRef = useRef(0);
   const baselineNonTypingCountRef = useRef(0);
   const [comingSoonKind, setComingSoonKind] = useState<"video" | null>(null);
+  const [callModeOpen, setCallModeOpen] = useState(false);
+  const [callAiMuted, setCallAiMuted] = useState(false);
   const [voiceInputOpen, setVoiceInputOpen] = useState(false);
   const [directVoiceListening, setDirectVoiceListening] = useState(false);
   const [directVoiceProcessing, setDirectVoiceProcessing] = useState(false);
@@ -308,6 +311,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const headerActions = useMemo(
     () =>
       [
+        {
+          label: "Call",
+          hint: "Call mode: calm voice-first screen (no video, no camera)",
+          action: "call" as const,
+        },
         {
           label: "Voice",
           hint: "Voice panel: review text, then send (mic in the bar dictates into the box)",
@@ -712,7 +720,61 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       clearTimeout(directVoiceSilenceTimerRef.current);
       directVoiceSilenceTimerRef.current = null;
     }
+    setCallModeOpen(false);
+    setCallAiMuted(false);
   }, [activeChatId, stopDirectVoice]);
+
+  const exitCallMode = useCallback(() => {
+    setCallModeOpen(false);
+    setCallAiMuted(false);
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {
+      // ignore
+    }
+    setTtsSpeakingMessageId(null);
+    stopDirectVoice();
+  }, [stopDirectVoice]);
+
+  useEffect(() => {
+    if (!callModeOpen) return;
+    if (typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [callModeOpen]);
+
+  useEffect(() => {
+    if (!callModeOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (voiceInputOpen) return;
+      exitCallMode();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [callModeOpen, voiceInputOpen, exitCallMode]);
+
+  const toggleCallAiMute = useCallback(() => {
+    setCallAiMuted((prev) => {
+      const next = !prev;
+      if (next) {
+        try {
+          if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            window.speechSynthesis.cancel();
+          }
+        } catch {
+          // ignore
+        }
+        setTtsSpeakingMessageId(null);
+      }
+      return next;
+    });
+  }, []);
 
   const handleTtsStart = useCallback((id: string) => {
     setTtsSpeakingMessageId(id);
@@ -742,6 +804,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     directVoiceUnavailableHint,
     ttsSpeakingMessageId,
   ]);
+
+  const callModeStatusText = useMemo(() => {
+    if (!callAiMuted) return voiceStatusText;
+    if (voiceStatusText) return `${voiceStatusText} · AI muted`;
+    return "AI muted — new replies stay silent";
+  }, [callAiMuted, voiceStatusText]);
 
   const voiceStatusKind = useMemo(() => {
     if (directVoiceListening) return "listening" as const;
@@ -1806,7 +1874,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     );
   }
 
-  const composerRecessed = jumpToLatestVisible && !composerPinnedOpen;
+  const composerRecessedFromScroll = jumpToLatestVisible && !composerPinnedOpen;
+  const composerRecessed = composerRecessedFromScroll || callModeOpen;
 
   return (
     <div className="flex min-h-[100dvh] w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-gradient-to-b from-black via-neutral-950 to-indigo-950/20 text-[rgb(var(--fg))]">
@@ -1967,6 +2036,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     type="button"
                     onClick={() => {
                       if (a.action === "settings") openSettingsPanel();
+                      if (a.action === "call") {
+                        setVoiceOutputUserActivated(true);
+                        setCallAiMuted(false);
+                        setCallModeOpen(true);
+                      }
                       if (a.action === "voice") {
                         setVoiceOutputUserActivated(true);
                         setVoiceInputOpen(true);
@@ -2054,6 +2128,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     autoPlayVoice={
                       settings.autoPlayAiVoice &&
                       voiceOutputUserActivated &&
+                      !callAiMuted &&
                       m.id === lastAssistantMessageId
                     }
                     preferredVoiceLanguage={settings.preferredVoiceLanguage}
@@ -2146,7 +2221,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             </div>
           ) : null}
 
-          {composerRecessed ? (
+          {composerRecessedFromScroll && !callModeOpen ? (
             <button
               type="button"
               onClick={revealComposer}
@@ -2189,6 +2264,23 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
           </div>
         </div>
       </div>
+
+      <CallModeOverlay
+        open={callModeOpen}
+        aiName={aiName}
+        aiSpeaking={!!ttsSpeakingMessageId}
+        userListening={directVoiceListening}
+        userWorking={
+          directVoiceProcessing ||
+          directVoiceSending ||
+          directVoiceSettling
+        }
+        aiMuted={callAiMuted}
+        onClose={exitCallMode}
+        onToggleMic={toggleDirectVoice}
+        onToggleAiMute={toggleCallAiMute}
+        statusLine={callModeStatusText}
+      />
 
       {voiceInputOpen ? (
         <VoiceInputPanel
