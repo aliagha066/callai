@@ -12,7 +12,7 @@ export const sampleMessages: ChatMessage[] = [
     id: "m1",
     role: "assistant",
     content:
-      "Hi — I’m here with you. Want to talk about what today has felt like?",
+      "Hi — I’m here for calm conversation. Type below, use the mic in the bar to dictate, or open Voice for a guided panel. Adjust tone and voice in Settings.",
   },
   {
     id: "m2",

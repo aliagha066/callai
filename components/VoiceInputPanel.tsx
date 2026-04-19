@@ -233,7 +233,10 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
           {!supported ? (
             <p className="text-sm leading-6 text-white/60">
-              Voice input is not supported on this browser yet.
+              This browser does not expose speech recognition (or it is blocked).
+              Try Chrome or Edge on desktop or Android, ensure a secure (HTTPS)
+              page, and check site permissions — you can still type your message
+              below.
             </p>
           ) : (
             <>
@@ -280,9 +283,13 @@ export function VoiceInputPanel({ onClose, onUseText, onSend }: Props) {
                     checked={autoSend}
                     onChange={(e) => setAutoSend(e.target.checked)}
                   />
-                  <span>Auto send voice messages</span>
+                  <span>Auto-send after dictation</span>
                 </label>
               </div>
+
+              <p className="mt-1 text-[11px] leading-relaxed text-white/35">
+                Quick toggle for this panel only — default lives in Settings → Voice.
+              </p>
 
               <p className="mt-2 text-[11px] leading-relaxed text-white/40">
                 {autoSend

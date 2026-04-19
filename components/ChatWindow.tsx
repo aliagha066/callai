@@ -239,10 +239,36 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   );
   const [voiceOutputUserActivated, setVoiceOutputUserActivated] = useState(false);
   const [memoryFacts, setMemoryFacts] = useState<MemoryFact[]>([]);
+  const [settingsQuickNotice, setSettingsQuickNotice] = useState<string | null>(
+    null,
+  );
+  const settingsQuickNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     setMemoryFacts(loadMemoryFacts(authedUserId));
   }, [authedUserId]);
+
+  useEffect(() => {
+    return () => {
+      if (settingsQuickNoticeTimerRef.current) {
+        clearTimeout(settingsQuickNoticeTimerRef.current);
+        settingsQuickNoticeTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  function flashSettingsQuickNotice(message: string) {
+    setSettingsQuickNotice(message);
+    if (settingsQuickNoticeTimerRef.current) {
+      clearTimeout(settingsQuickNoticeTimerRef.current);
+    }
+    settingsQuickNoticeTimerRef.current = setTimeout(() => {
+      setSettingsQuickNotice(null);
+      settingsQuickNoticeTimerRef.current = null;
+    }, 4500);
+  }
 
   useEffect(() => {
     saveMemoryFacts(authedUserId, memoryFacts);
@@ -255,12 +281,20 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const headerActions = useMemo(
     () =>
       [
-        { label: "Voice", hint: "Dictate into the message box", action: "voice" as const },
-        { label: "Video", hint: "Video (preview)", action: "video" as const },
         {
-          label: "Modes",
-          hint: "Open settings — companion mode & style",
-          action: "modes" as const,
+          label: "Voice",
+          hint: "Voice panel: review text, then send (mic in the bar dictates into the box)",
+          action: "voice" as const,
+        },
+        {
+          label: "Video",
+          hint: "Coming soon — not available yet",
+          action: "video" as const,
+        },
+        {
+          label: "Settings",
+          hint: "Name, companion mode, language, and voice",
+          action: "settings" as const,
         },
       ] as const,
     [],
@@ -553,7 +587,9 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   }, []);
 
   const voiceStatusText = useMemo(() => {
-    if (directVoiceUnavailableHint) return "Voice unavailable";
+    if (directVoiceUnavailableHint) {
+      return "Mic dictation unavailable — tap Voice or type";
+    }
     if (directVoiceStoppedHint) return "Stopped";
     if (directVoiceSending) return "Sending…";
     if (directVoiceProcessing) return "Processing…";
@@ -573,10 +609,22 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
   const voiceStatusKind = useMemo(() => {
     if (directVoiceListening) return "listening" as const;
-    if (directVoiceProcessing || directVoiceSending) return "working" as const;
+    if (
+      directVoiceProcessing ||
+      directVoiceSending ||
+      directVoiceSettling
+    ) {
+      return "working" as const;
+    }
     if (ttsSpeakingMessageId) return "speaking" as const;
     return "idle" as const;
-  }, [directVoiceListening, directVoiceProcessing, directVoiceSending, ttsSpeakingMessageId]);
+  }, [
+    directVoiceListening,
+    directVoiceProcessing,
+    directVoiceSending,
+    directVoiceSettling,
+    ttsSpeakingMessageId,
+  ]);
 
   const filteredChats = useMemo(() => {
     const q = chatSearch.trim().toLowerCase();
@@ -1631,6 +1679,14 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             >
               New Chat
             </button>
+            <button
+              type="button"
+              onClick={openSettingsPanel}
+              className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-2xl border border-white/10 bg-black/20 px-4 text-xs font-semibold text-white/65 ring-1 ring-white/5 transition-all duration-200 hover:bg-white/5 hover:text-white/85 hover:brightness-110"
+              title="Open settings"
+            >
+              Settings
+            </button>
             <div className="mt-3">
               <input
                 value={chatSearch}
@@ -1680,6 +1736,17 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                   title="Start a new chat"
                 >
                   New Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileChatDrawerOpen(false);
+                    openSettingsPanel();
+                  }}
+                  className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-2xl border border-white/10 bg-black/20 px-4 text-xs font-semibold text-white/65 ring-1 ring-white/5 transition-all duration-200 hover:bg-white/5 hover:text-white/85 hover:brightness-110"
+                  title="Open settings"
+                >
+                  Settings
                 </button>
                 <div className="mt-3">
                   <input
@@ -1738,8 +1805,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     <p className="truncate text-sm font-semibold tracking-tight text-white/90">
                       {brandName}
                     </p>
-                    <p className="hidden text-xs text-white/45 sm:block">
-                      Companion chat · UI prototype
+                    <p className="truncate text-xs text-white/45">
+                      Calm companion chat
                     </p>
                   </div>
                 </Link>
@@ -1751,7 +1818,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     key={a.label}
                     type="button"
                     onClick={() => {
-                      if (a.action === "modes") openSettingsPanel();
+                      if (a.action === "settings") openSettingsPanel();
                       if (a.action === "voice") {
                         setVoiceOutputUserActivated(true);
                         setVoiceInputOpen(true);
@@ -1775,7 +1842,15 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                     onChange={(e) => {
                       const on = e.target.checked;
                       if (on) setVoiceOutputUserActivated(true);
-                      void saveSettings({ ...settings, autoPlayAiVoice: on });
+                      void saveSettings({ ...settings, autoPlayAiVoice: on }).catch(
+                        (err) => {
+                          flashSettingsQuickNotice(
+                            err instanceof Error
+                              ? err.message
+                              : "Could not save Auto-play",
+                          );
+                        },
+                      );
                     }}
                   />
                   <span className="hidden sm:inline">Auto-play AI voice</span>
@@ -1801,6 +1876,16 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
                   <span className="hidden sm:inline">Clear chat</span>
                 </button>
               </div>
+              {settingsQuickNotice ? (
+                <div className="w-full basis-full pb-1 sm:pb-0">
+                  <p
+                    className="text-center text-[11px] leading-snug text-amber-200/90 sm:text-right"
+                    role="status"
+                  >
+                    {settingsQuickNotice}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </header>
 
@@ -1904,7 +1989,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
           className="fixed inset-0 z-[61] flex items-end justify-center p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
-          aria-label="Video coming soon"
+          aria-label="Video not available yet"
         >
           <button
             type="button"
@@ -1913,16 +1998,17 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
             onClick={() => setComingSoonKind(null)}
           />
           <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--panel))] p-4 shadow-[0_0_40px_rgba(0,0,0,0.6)]">
-            <p className="text-sm font-semibold text-white/85">Video</p>
+            <p className="text-sm font-semibold text-white/85">Video calls</p>
             <p className="mt-2 text-sm leading-6 text-white/60">
-              Video is coming soon.
+              Video isn&apos;t available yet — this button is only here to show
+              what&apos;s planned. Chat and voice still work as usual.
             </p>
             <button
               type="button"
               onClick={() => setComingSoonKind(null)}
               className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white/10 px-4 text-sm font-semibold text-white/85 ring-1 ring-white/10 transition-all duration-200 hover:bg-white/14 hover:brightness-110"
             >
-              OK
+              Got it
             </button>
           </div>
         </div>

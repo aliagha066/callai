@@ -111,9 +111,13 @@ export function ChatInput({
                             ? "bg-emerald-500/10 text-white/90 ring-emerald-400/25 hover:bg-emerald-500/12"
                             : "bg-white/5 text-white/80 hover:bg-white/10 hover:text-white/90",
                     ].join(" ")}
-                    aria-label={voiceListening ? "Stop voice input" : "Voice input"}
+                    aria-label={voiceListening ? "Stop dictation" : "Start dictation"}
                     title={
-                      onVoiceMicToggle ? "Tap to toggle voice input" : "Voice input"
+                      onVoiceOpenPanelFallback && onVoiceMicToggle
+                        ? "Tap: dictate into the message · Long-press: open voice panel"
+                        : onVoiceMicToggle
+                          ? "Tap: toggle dictation into the message"
+                          : "Voice input"
                     }
                   >
                     <span className="text-[18px] leading-none">{"\u{1F3A4}"}</span>
@@ -147,10 +151,12 @@ export function ChatInput({
 
         <div className="mx-auto w-full max-w-4xl mt-2 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <p className="min-w-0 text-xs text-white/40">
-            UI-only prototype. Voice/video, accounts, and saved chats come later.
+            Type or dictate, then send. Logged in: chats sync to your account. Guest:
+            chats stay on this device. Voice works best in Chrome or Edge over HTTPS.
           </p>
-          <p className="hidden text-xs text-white/35 sm:block">
-            Enter to send · Shift+Enter for new line
+          <p className="text-xs text-white/35 sm:text-right">
+            <span className="sm:hidden">Enter sends · Shift+Enter newline</span>
+            <span className="hidden sm:inline">Enter to send · Shift+Enter for new line</span>
           </p>
         </div>
       </div>

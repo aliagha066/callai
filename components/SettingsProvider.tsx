@@ -234,9 +234,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       close: () => setIsOpen(false),
       save: async (next) => {
         const safe = coerceSettings(next);
-        setSettings(safe);
 
         if (!authedUserId) {
+          setSettings(safe);
           saveGuestSettings(safe);
           try {
             window.dispatchEvent(new CustomEvent("callai:settings-saved"));
@@ -247,7 +247,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Upsert to Supabase for logged-in users.
-        await supabase.from("user_settings").upsert({
+        const { error } = await supabase.from("user_settings").upsert({
           user_id: authedUserId,
           display_name: safe.displayName,
           ai_name: safe.aiName,
@@ -260,6 +260,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           voice_speech_rate: safe.voiceSpeechRate,
           updated_at: new Date().toISOString(),
         });
+        if (error) throw error;
+        setSettings(safe);
         try {
           window.dispatchEvent(new CustomEvent("callai:settings-saved"));
         } catch {

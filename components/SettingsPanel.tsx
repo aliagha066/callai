@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type CompanionMode,
   type PreferredLanguage,
@@ -16,13 +16,18 @@ export function SettingsPanel() {
   const [draft, setDraft] = useState(settings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const wasOpenRef = useRef(isOpen);
 
-  // Keep draft in sync when opening.
-  useMemo(() => {
-    if (!isOpen) return;
-    setDraft(settings);
-    setError(null);
-    setBusy(false);
+  // When the panel opens, load the latest saved settings into the draft once.
+  // Avoid resetting on every settings tick while the user is editing.
+  useEffect(() => {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+    if (isOpen && !wasOpen) {
+      setDraft(settings);
+      setError(null);
+      setBusy(false);
+    }
   }, [isOpen, settings]);
 
   if (!isOpen) return null;
@@ -54,7 +59,8 @@ export function SettingsPanel() {
             <div>
               <p className="text-sm font-semibold text-white/90">Settings</p>
               <p className="mt-1 text-xs text-white/55">
-                Personalize how your companion responds.
+                Tap Save to apply. Guests: stored on this device. Signed in: synced to
+                your account.
               </p>
             </div>
             <button
@@ -118,6 +124,9 @@ export function SettingsPanel() {
                   <option value="Azerbaijani">Azerbaijani</option>
                   <option value="Turkish">Turkish</option>
                 </select>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/40">
+                  Affects assistant replies (API), not the read-aloud voice picker below.
+                </p>
               </div>
 
               <div>
@@ -178,7 +187,7 @@ export function SettingsPanel() {
                 </label>
 
                 <label className="flex cursor-pointer items-center justify-between gap-3 text-[11px] font-medium text-white/65">
-                  <span>Auto-send voice messages</span>
+                  <span>Auto-send after dictation</span>
                   <input
                     type="checkbox"
                     className="h-3.5 w-3.5 rounded border border-white/25 bg-black/40 text-indigo-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
@@ -238,7 +247,8 @@ export function SettingsPanel() {
               </div>
 
               <p className="mt-2 text-[11px] leading-relaxed text-white/40">
-                Voice language uses your message language when set to Auto.
+                Read-aloud only: Auto follows the message text; a fixed choice prefers
+                that accent when your browser has a matching voice.
               </p>
             </div>
           </div>

@@ -334,7 +334,7 @@ export function AuthControls({ compact }: Props) {
             >
               Close
             </button>
-            <span className="text-[11px] text-white/35">UI-only. No DB yet.</span>
+            <span className="text-[11px] text-white/35">Secure sign-in · chats sync when logged in</span>
           </div>
         </div>
       ) : null}

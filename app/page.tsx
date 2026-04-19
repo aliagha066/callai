@@ -20,7 +20,8 @@ export default function Home() {
             © {new Date().getFullYear()} CallAI. Built for calm, human connection.
           </p>
           <p className="text-sm text-white/40">
-            Voice, video, modes, and accounts coming later.
+            Video calls are planned next; chat, voice, accounts, and saved history
+            already work in the app.
           </p>
         </div>
       </footer>
