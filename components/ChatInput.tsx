@@ -108,7 +108,7 @@ export function ChatInput({
                     }}
                     disabled={disabled}
                     className={[
-                      "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 text-sm font-semibold ring-1 ring-white/10 shadow-[0_0_14px_rgba(99,102,241,0.05)] transition-all duration-200 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11 sm:shadow-[0_0_20px_rgba(99,102,241,0.06)]",
+                      "touch-manipulation inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 text-sm font-semibold ring-1 ring-white/10 shadow-[0_0_14px_rgba(99,102,241,0.05)] transition-all duration-200 hover:brightness-110 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-11 sm:shadow-[0_0_20px_rgba(99,102,241,0.06)]",
                       voiceStatusKind === "listening"
                         ? "bg-indigo-500/22 text-white ring-indigo-400/40 hover:bg-indigo-500/26"
                         : voiceStatusKind === "working"

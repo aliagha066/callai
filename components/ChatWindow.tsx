@@ -257,6 +257,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     null,
   );
   const directVoiceRecRef = useRef<SpeechRecognitionLike | null>(null);
+  /** True after rec.stop() until onend has finished; blocks overlapping sessions. */
+  const directVoiceOnEndPendingRef = useRef(false);
+  const directVoiceOnEndGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const directVoicePreviewRef = useRef("");
   const finalVoiceTranscriptRef = useRef("");
   const lastInterimTranscriptRef = useRef("");
@@ -477,6 +482,17 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
     const rec = directVoiceRecRef.current;
     if (!rec) return;
+    directVoiceOnEndPendingRef.current = true;
+    if (directVoiceOnEndGuardTimerRef.current) {
+      clearTimeout(directVoiceOnEndGuardTimerRef.current);
+      directVoiceOnEndGuardTimerRef.current = null;
+    }
+    directVoiceOnEndGuardTimerRef.current = setTimeout(() => {
+      directVoiceOnEndGuardTimerRef.current = null;
+      if (directVoiceOnEndPendingRef.current) {
+        directVoiceOnEndPendingRef.current = false;
+      }
+    }, 2000);
     setDirectVoiceProcessing(true);
     try {
       rec.stop();
@@ -494,6 +510,7 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const startDirectVoice = useCallback(() => {
     setVoiceOutputUserActivated(true);
 
+    if (directVoiceOnEndPendingRef.current) return;
     if (directVoiceRecRef.current) return;
 
     // If AI is speaking, interrupt it before listening (call-like feel).
@@ -615,9 +632,13 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     };
 
     rec.onend = () => {
-      setDirectVoiceListening(false);
-      setDirectVoiceProcessing(false);
-      directVoiceRecRef.current = null;
+      // Snapshot first so a new session cannot reset transcript refs before we read.
+      const finals = finalVoiceTranscriptRef.current.trim();
+      const live = lastInterimTranscriptRef.current.trim();
+      const manual = manualVoiceStopRef.current;
+      manualVoiceStopRef.current = false;
+      const latest = (finals || (manual ? live : "")).trim();
+
       if (directVoiceSilenceTimerRef.current) {
         clearTimeout(directVoiceSilenceTimerRef.current);
         directVoiceSilenceTimerRef.current = null;
@@ -626,17 +647,22 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         clearTimeout(directVoiceSettleHintTimerRef.current);
         directVoiceSettleHintTimerRef.current = null;
       }
+      if (directVoiceOnEndGuardTimerRef.current) {
+        clearTimeout(directVoiceOnEndGuardTimerRef.current);
+        directVoiceOnEndGuardTimerRef.current = null;
+      }
+
+      if (directVoiceRecRef.current === rec) {
+        directVoiceRecRef.current = null;
+      }
+      directVoiceOnEndPendingRef.current = false;
+
+      setDirectVoiceListening(false);
+      setDirectVoiceProcessing(false);
       setDirectVoiceSettling(false);
 
-      const finals = finalVoiceTranscriptRef.current.trim();
-      const live = lastInterimTranscriptRef.current.trim();
-      const manual = manualVoiceStopRef.current;
-      manualVoiceStopRef.current = false;
-
-      const latest = (finals || (manual ? live : "")).trim();
       if (!latest) return;
 
-      // Auto end: prefer finalized segments; avoid sending unstable interim-only captures.
       if (!manual) {
         if (!finals) return;
       }
@@ -669,6 +695,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       rec.start();
     } catch {
       stopDirectVoice();
+      if (directVoiceOnEndGuardTimerRef.current) {
+        clearTimeout(directVoiceOnEndGuardTimerRef.current);
+        directVoiceOnEndGuardTimerRef.current = null;
+      }
+      // onend may not run if start() threw; release so the next tap can start.
+      directVoiceOnEndPendingRef.current = false;
       if (!callModeOpenRef.current) {
         setVoiceInputOpen(true);
       }
@@ -678,7 +710,9 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
   const toggleDirectVoice = useCallback(() => {
     setVoiceOutputUserActivated(true);
 
-    if (directVoiceRecRef.current || directVoiceListening) {
+    // Ref only: React’s listening flag can stay true for a frame after ref clears,
+    // which used to make the next “start” look like a no-op.
+    if (directVoiceRecRef.current) {
       manualVoiceStopRef.current = true;
       setDirectVoiceStoppedHint(true);
       if (directVoiceHintTimerRef.current) {
@@ -695,11 +729,16 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
 
     manualVoiceStopRef.current = false;
     startDirectVoice();
-  }, [directVoiceListening, startDirectVoice, stopDirectVoice]);
+  }, [startDirectVoice, stopDirectVoice]);
 
   useEffect(() => {
     return () => {
       stopDirectVoice();
+      if (directVoiceOnEndGuardTimerRef.current) {
+        clearTimeout(directVoiceOnEndGuardTimerRef.current);
+        directVoiceOnEndGuardTimerRef.current = null;
+      }
+      directVoiceOnEndPendingRef.current = false;
       if (directVoiceHintTimerRef.current) {
         clearTimeout(directVoiceHintTimerRef.current);
         directVoiceHintTimerRef.current = null;
@@ -739,6 +778,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
       clearTimeout(directVoiceSilenceTimerRef.current);
       directVoiceSilenceTimerRef.current = null;
     }
+    if (directVoiceOnEndGuardTimerRef.current) {
+      clearTimeout(directVoiceOnEndGuardTimerRef.current);
+      directVoiceOnEndGuardTimerRef.current = null;
+    }
+    directVoiceOnEndPendingRef.current = false;
     setCallModeOpen(false);
     setCallAiMuted(false);
   }, [activeChatId, stopDirectVoice]);
@@ -755,6 +799,11 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     }
     setTtsSpeakingMessageId(null);
     stopDirectVoice();
+    if (directVoiceOnEndGuardTimerRef.current) {
+      clearTimeout(directVoiceOnEndGuardTimerRef.current);
+      directVoiceOnEndGuardTimerRef.current = null;
+    }
+    directVoiceOnEndPendingRef.current = false;
   }, [stopDirectVoice]);
 
   useEffect(() => {

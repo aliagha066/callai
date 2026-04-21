@@ -209,7 +209,7 @@ export function CallModeOverlay({
           type="button"
           onClick={onToggleAiMute}
           className={[
-            "inline-flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-full border text-sm font-medium shadow-[0_8px_28px_rgba(0,0,0,0.35)] transition-all duration-200 sm:h-14 sm:w-14",
+            "touch-manipulation select-none inline-flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-full border text-sm font-medium shadow-[0_8px_28px_rgba(0,0,0,0.35)] transition-all duration-200 sm:h-14 sm:w-14",
             aiMuted
               ? "border-amber-400/40 bg-amber-500/20 text-amber-50 ring-2 ring-amber-400/30"
               : "border-white/12 bg-white/[0.08] text-white/90 ring-1 ring-white/8 hover:bg-white/12",
@@ -226,7 +226,7 @@ export function CallModeOverlay({
           type="button"
           onClick={onToggleMic}
           className={[
-            "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-2xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] transition-all duration-200 sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[1.75rem]",
+            "touch-manipulation select-none inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-2xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] transition-all duration-200 sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[1.75rem]",
             userListening
               ? "border-indigo-300/50 bg-indigo-500/30 text-white ring-4 ring-indigo-400/25"
               : "border-white/15 bg-gradient-to-b from-white/15 to-white/[0.07] text-white ring-1 ring-white/10 hover:from-white/18 hover:to-white/10",
@@ -244,7 +244,7 @@ export function CallModeOverlay({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-full border border-red-500/30 bg-gradient-to-b from-red-500/25 to-red-600/20 text-sm font-bold text-red-100 shadow-[0_8px_28px_rgba(220,38,38,0.25)] ring-1 ring-red-500/20 transition-all duration-200 hover:from-red-500/35 hover:to-red-600/30 sm:h-14 sm:w-14"
+          className="touch-manipulation select-none inline-flex h-[3.25rem] w-[3.25rem] shrink-0 items-center justify-center rounded-full border border-red-500/30 bg-gradient-to-b from-red-500/25 to-red-600/20 text-sm font-bold text-red-100 shadow-[0_8px_28px_rgba(220,38,38,0.25)] ring-1 ring-red-500/20 transition-all duration-200 hover:from-red-500/35 hover:to-red-600/30 sm:h-14 sm:w-14"
           aria-label="End call"
           title="End call"
         >
