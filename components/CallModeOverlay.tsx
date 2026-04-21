@@ -3,11 +3,13 @@
 type Props = {
   open: boolean;
   aiName: string;
+  /** Model / network in progress (Call Mode) */
+  isThinking: boolean;
   /** AI text-to-speech is actively playing */
   aiSpeaking: boolean;
   /** User mic dictation session is active */
   userListening: boolean;
-  /** Recognition / send in progress */
+  /** Recognition settling / processing (not “thinking” — that is isThinking) */
   userWorking: boolean;
   /** When true, new AI replies will not auto-speak (no webcam / stream) */
   aiMuted: boolean;
@@ -20,6 +22,7 @@ type Props = {
 export function CallModeOverlay({
   open,
   aiName,
+  isThinking,
   aiSpeaking,
   userListening,
   userWorking,
@@ -31,8 +34,11 @@ export function CallModeOverlay({
 }: Props) {
   if (!open) return null;
 
-  const showWaveform = aiSpeaking && !aiMuted;
-  const showListenRing = userListening || (userWorking && !userListening);
+  const showSpeaking = aiSpeaking && !aiMuted;
+  const showThinking = isThinking && !showSpeaking;
+  const showListenRing =
+    (userListening || userWorking) && !showThinking && !showSpeaking;
+  const showWaveform = showSpeaking;
 
   return (
     <div
@@ -64,9 +70,11 @@ export function CallModeOverlay({
               "pointer-events-none absolute inset-[-18%] rounded-full transition-opacity duration-300",
               showWaveform
                 ? "opacity-100 bg-[radial-gradient(circle,rgba(var(--accent),0.35)_0%,transparent_68%)] motion-safe:animate-pulse"
-                : showListenRing
-                  ? "opacity-90 bg-[radial-gradient(circle,rgba(56,189,248,0.22)_0%,transparent_70%)] motion-safe:animate-pulse"
-                  : "opacity-0",
+                : showThinking
+                  ? "opacity-95 bg-[radial-gradient(circle,rgba(250,204,21,0.18)_0%,transparent_68%)] motion-safe:animate-pulse"
+                  : showListenRing
+                    ? "opacity-90 bg-[radial-gradient(circle,rgba(56,189,248,0.22)_0%,transparent_70%)] motion-safe:animate-pulse"
+                    : "opacity-0",
             ].join(" ")}
             aria-hidden
           />
@@ -76,9 +84,11 @@ export function CallModeOverlay({
               "relative flex h-[min(52vw,13.5rem)] w-[min(52vw,13.5rem)] items-center justify-center rounded-full bg-gradient-to-b from-neutral-900/70 via-neutral-900/35 to-indigo-500/15 ring-2 transition-[box-shadow,transform] duration-300 motion-reduce:transition-none sm:h-56 sm:w-56",
               showWaveform
                 ? "shadow-[0_0_0_1px_rgba(var(--accent),0.35),0_0_48px_rgba(var(--accent-2),0.35)] motion-safe:scale-[1.02]"
-                : showListenRing
-                  ? "shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_36px_rgba(56,189,248,0.2)]"
-                  : "shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_24px_rgba(99,102,241,0.12)]",
+                : showThinking
+                  ? "shadow-[0_0_0_1px_rgba(250,204,21,0.35),0_0_40px_rgba(250,204,21,0.14)]"
+                  : showListenRing
+                    ? "shadow-[0_0_0_1px_rgba(56,189,248,0.35),0_0_36px_rgba(56,189,248,0.2)]"
+                    : "shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_24px_rgba(99,102,241,0.12)]",
             ].join(" ")}
           >
             <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_32%_28%,rgba(var(--accent),0.2),transparent_60%)]" />
@@ -104,6 +114,19 @@ export function CallModeOverlay({
                 />
               ))}
             </div>
+          ) : showThinking ? (
+            <div
+              className="mt-7 flex h-8 items-end justify-center gap-1.5 sm:mt-8"
+              aria-hidden
+            >
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="callai-thinking-dot h-1.5 w-1.5 rounded-full bg-amber-200/60 motion-safe:animate-pulse"
+                  style={{ animationDelay: `${i * 160}ms` }}
+                />
+              ))}
+            </div>
           ) : (
             <div className="mt-7 h-8 sm:mt-8" aria-hidden />
           )}
@@ -113,8 +136,8 @@ export function CallModeOverlay({
           </p>
           <p
             className={[
-              "mt-1 min-h-[1.25rem] text-center text-xs transition-opacity duration-200",
-              statusLine ? "text-white/50 opacity-100" : "text-white/35 opacity-0",
+                "mt-1 min-h-[1.25rem] text-center text-[11px] font-semibold leading-snug tracking-wide text-white/55 transition-opacity duration-200 sm:text-xs",
+                statusLine ? "opacity-100" : "text-white/30 opacity-0",
             ].join(" ")}
             aria-live="polite"
           >
@@ -134,7 +157,11 @@ export function CallModeOverlay({
               : "border-white/15 bg-white/10 text-white/90 ring-1 ring-white/10 hover:bg-white/14",
           ].join(" ")}
           aria-label={userListening ? "Stop microphone" : "Start microphone"}
-          title={userListening ? "Stop mic" : "Mic — dictate into your message"}
+          title={
+            userListening
+              ? "Stop — what you said will be sent"
+              : "Speak — message sends when you stop"
+          }
         >
           {"\u{1F3A4}"}
         </button>
