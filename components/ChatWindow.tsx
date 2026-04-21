@@ -691,6 +691,8 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
     };
 
     directVoiceRecRef.current = rec;
+    // Show “listening” immediately so the mic reacts on tap (onstart can lag on mobile).
+    setDirectVoiceListening(true);
     try {
       rec.start();
     } catch {
@@ -2361,6 +2363,12 @@ function ChatWindowInner({ brandName = "CallAI" }: Props) {
         isThinking={callModeIsThinking}
         aiSpeaking={!!ttsSpeakingMessageId}
         userListening={directVoiceListening}
+        micWorking={
+          !directVoiceListening &&
+          (directVoiceProcessing ||
+            directVoiceSending ||
+            directVoiceSettling)
+        }
         userWorking={directVoiceProcessing || directVoiceSettling}
         aiMuted={callAiMuted}
         onClose={exitCallMode}

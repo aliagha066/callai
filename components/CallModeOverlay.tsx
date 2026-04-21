@@ -9,6 +9,8 @@ type Props = {
   aiSpeaking: boolean;
   /** User mic dictation session is active */
   userListening: boolean;
+  /** Mic pipeline busy after stop / send (subtle; avoids “dead” mic between taps) */
+  micWorking?: boolean;
   /** Recognition settling / processing (not “thinking” — that is isThinking) */
   userWorking: boolean;
   /** When true, new AI replies will not auto-speak (no webcam / stream) */
@@ -25,6 +27,7 @@ export function CallModeOverlay({
   isThinking,
   aiSpeaking,
   userListening,
+  micWorking = false,
   userWorking,
   aiMuted,
   onClose,
@@ -226,16 +229,21 @@ export function CallModeOverlay({
           type="button"
           onClick={onToggleMic}
           className={[
-            "touch-manipulation select-none inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-2xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] transition-all duration-200 sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[1.75rem]",
+            "touch-manipulation select-none inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 text-2xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] transition-[color,background-color,border-color,box-shadow] duration-200 sm:h-[4.5rem] sm:w-[4.5rem] sm:text-[1.75rem]",
+            "ring-2 ring-transparent",
             userListening
-              ? "border-indigo-300/50 bg-indigo-500/30 text-white ring-4 ring-indigo-400/25"
-              : "border-white/15 bg-gradient-to-b from-white/15 to-white/[0.07] text-white ring-1 ring-white/10 hover:from-white/18 hover:to-white/10",
+              ? "border-indigo-300/55 bg-indigo-500/32 text-white ring-indigo-400/45 shadow-[0_0_28px_rgba(99,102,241,0.35)]"
+              : micWorking
+                ? "border-white/22 bg-white/12 text-white/95 ring-white/18"
+                : "border-white/15 bg-gradient-to-b from-white/15 to-white/[0.07] text-white hover:from-white/18 hover:to-white/10",
           ].join(" ")}
           aria-label={userListening ? "Stop microphone" : "Start microphone"}
           title={
             userListening
-              ? "Stop — your message sends next"
-              : "Tap to speak"
+              ? "Tap again to stop and send"
+              : micWorking
+                ? "Finishing…"
+                : "Tap to speak"
           }
         >
           {"\u{1F3A4}"}
